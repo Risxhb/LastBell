@@ -17,7 +17,7 @@ namespace LastBell.Menu
         // Returns true when the caller should keep running.
         public static bool Route(GameObject owner)
         {
-            if(RunAutoTest.Requested||MapPreviewCapture.Requested||MenuSmokeTest.Requested)return true;
+            if(RunAutoTest.Requested||Run.Shop.RunShopAutoTest.Requested||MapPreviewCapture.Requested||MenuSmokeTest.Requested)return true;
             if(!Application.CanStreamedLevelBeLoaded(ScenePath)){Debug.LogError("The Confrontation menu is missing from this build.");return true;}
             owner.SetActive(false);
             SceneManager.LoadScene(ScenePath,LoadSceneMode.Single);

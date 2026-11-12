@@ -32,7 +32,7 @@ namespace LastBell.Menu
         // Start Run was greyed out for players from October 27, 2026 (Risxhb) until the campaign existed. It is back for the
         // campaign (Risx, November 4, 2026; Run/Campaign.cs): tutorial, three arenas of minibosses and bosses, the Bellkeeper.
         // Set false to grey it out again (shown but not clickable, skipped by keyboard and controller focus).
-        public static bool StartRunEnabled = true;
+        public static bool StartRunEnabled = !TestRushSetup.DemoCut;   // the browser demo is Boss Rush only
         public CharacterPresenter Hero { get; private set; }
         public CharacterPresenter Boss { get; private set; }
         public Transform BossWrapper { get; private set; }
@@ -125,10 +125,13 @@ namespace LastBell.Menu
             // One player for everything (4 Nov 2026): Start Run, Boss Rush and Multiplayer (the LAN lobby) on one menu.
             StartButton=Nav("Start Run",panel,.58f,StartRun,28);RushButton=Nav("Boss Rush",panel,.48f,BossRush);
             StartButton.interactable=StartRunEnabled;   // greyed out: NavFocus dims a non-interactable label
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // The browser demo ships without LAN: no Multiplayer row and no lobby scene (WebDemoBuild), and the rows below move up.
+            SettingsButton=Nav("Settings",panel,.38f,OpenSettings);ExitButton=Nav("Exit",panel,.28f,Exit);
+            ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
+#else
             MultiplayerButton=Nav("Multiplayer",panel,.38f,OpenLan);
             SettingsButton=Nav("Settings",panel,.28f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
-#if UNITY_WEBGL && !UNITY_EDITOR
-            ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
 #endif
             // Class picker keeps its approved place above Start Run, as a secondary control.
             selectClass=MenuUI.Text(UiTheme.Spaced("Select Class"),panel,new Vector2(0,.705f),new Vector2(1,.745f),13,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.72f));
@@ -234,7 +237,7 @@ namespace LastBell.Menu
 
         // ---------------------------------------------------------------- settings
         // Settings replaces the navigation column in place, in the same language as the menu and Boss Rush:
-        // eyebrow, title and gold rule, text rows with a highlight strip, faint dividers, Gold primary + text Back.
+        // eyebrow, title and gold rule, text rows with a highlight strip, faint dividers; Back and Apply are text rows too.
         void BuildSettings()
         {
             var block=MenuUI.Panel("Settings modal",safe,Vector2.zero,Vector2.one,new Color(0,0,0,.35f));block.raycastTarget=true;settings=block.gameObject;
@@ -289,7 +292,7 @@ namespace LastBell.Menu
                 var close=blocker.gameObject.AddComponent<Button>();close.transition=Selectable.Transition.None;close.navigation=new Navigation{mode=Navigation.Mode.None};close.onClick.AddListener(CloseResolutionList);
                 var frame=MenuUI.Panel("Resolution list",col,new Vector2(.46f,RowY(2)),new Vector2(1,RowY(2)),new Color(UiTheme.InkDeep.r,UiTheme.InkDeep.g,UiTheme.InkDeep.b,.97f));
                 frame.raycastTarget=true;frame.rectTransform.pivot=new Vector2(.5f,1);frame.rectTransform.anchoredPosition=new Vector2(0,-2);
-                var edge=frame.gameObject.AddComponent<Outline>();edge.effectColor=new Color(UiTheme.Gold.r,UiTheme.Gold.g,UiTheme.Gold.b,.7f);edge.effectDistance=new Vector2(1,-1);
+                MenuUI.Stroke(frame.transform,UiTheme.StripEdge,1);   // the shared 1 px edge (a uGUI Outline redraws the whole quad)
                 var viewport=MenuUI.Rect("Viewport",frame.transform,Vector2.zero,Vector2.one,new Vector2(4,4));viewport.gameObject.AddComponent<RectMask2D>();
                 var content=MenuUI.Rect("Content",viewport,new Vector2(0,1),new Vector2(1,1));content.pivot=new Vector2(.5f,1);content.anchoredPosition=Vector2.zero;
                 var scroll=frame.gameObject.AddComponent<ScrollRect>();scroll.viewport=viewport;scroll.content=content;scroll.horizontal=false;scroll.movementType=ScrollRect.MovementType.Clamped;scroll.scrollSensitivity=itemH;

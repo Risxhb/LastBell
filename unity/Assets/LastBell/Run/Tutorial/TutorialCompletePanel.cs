@@ -9,8 +9,8 @@ namespace LastBell.Run
     public sealed class TutorialCompletePanel : MonoBehaviour
     {
         public static TutorialCompletePanel Current { get; private set; }
-        RunDirector d; string body = "";
-        GUIStyle sTitle, sBody, sSection; float styledFor = -1; static Texture2D panelTex;
+        RunDirector d; string lead = "", result = "", next = "";
+        GUIStyle sTitle, sBody, sResult; int styledFor = -1; readonly GUIContent measure = new GUIContent();
 
         public static void Show(RunDirector director, IReadOnlyList<TutorialDirector.Record> records)
         {
@@ -19,34 +19,41 @@ namespace LastBell.Run
             p.d = director; Current = p;
             int drills = records.Count(r => r.Tries > 1 || !r.Passed);
             var missed = records.Where(r => !r.Passed).Select(r => r.Title).ToList();
-            p.body = "The Tempo Tyrant falls. You've seen every mechanic in the game so far: read the shape, step out, punish.\n\n"
-                + (missed.Count == 0 ? "Every mechanic handled." : "To practise: " + string.Join(", ", missed) + ".")
-                + (director.Mode == RunMode.Run ? "\n\nNext: Skyward Spire. Three minibosses guard Aurelion."
-                    : "\n\nNext: Boss Rush to fight any boss for real, or Retry (R) to run the tutorial again.");
+            p.lead = "The Tempo Tyrant falls. You've seen every mechanic in the game so far: read the shape, step out, punish.";
+            p.result = missed.Count == 0 ? "Every mechanic handled." : "To practise: " + string.Join(", ", missed) + ".";
+            // Retry and Main Menu are rows on the results band beside this card, so the card only points onward
+            p.next = director.Mode == RunMode.Run ? "Next: Skyward Spire. Three minibosses guard Aurelion." : "Next: Boss Rush, to fight any boss for real.";
         }
 
         void OnDestroy() { if (Current == this) Current = null; }
 
+        // Same card as the tutorial's instruction panel (TutorialDirector.CardBack): an ink strip with a Gold left bar fading out
+        // on the right, spaced Gold eyebrow, Ivory title, 96x2 Gold rule; the lead in body text, the result as a GoldBright
+        // line, then where to go next. Left side, beside the centred Results band.
         void OnGUI()
         {
             if (!d || (d.State != RunState.Cleared && d.State != RunState.Results)) { if (d && d.State != RunState.Combat) Destroy(this); return; }
             GUI.depth = -20;
-            float k = Screen.height / 1080f;
-            if (!Mathf.Approximately(styledFor, k))
+            if (styledFor != Screen.height)
             {
-                styledFor = k;
-                sSection = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(15 * k), fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.93f, 0.74f, 0.38f) } };
-                sTitle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(30 * k), fontStyle = FontStyle.Bold, normal = { textColor = new Color(1f, 0.86f, 0.5f) } };
-                sBody = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(19 * k), wordWrap = true, normal = { textColor = new Color(0.92f, 0.9f, 0.86f) } };
+                styledFor = Screen.height;
+                sTitle = UiTheme.Style(TutorialDirector.TitleSize, true, TextAnchor.UpperLeft, UiTheme.Ivory, true);
+                sBody = UiTheme.Style(TutorialDirector.BodySize, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true);
+                sResult = UiTheme.Style(TutorialDirector.BodySize, true, TextAnchor.UpperLeft, UiTheme.GoldBright, true);
             }
-            if (!panelTex) { panelTex = new Texture2D(1, 1); panelTex.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.08f, 0.85f)); panelTex.Apply(); }
-            float w = 560 * k, x = 24 * k, y = 150 * k, pad = 18 * k, inner = w - 2 * pad;
-            float bh = sBody.CalcHeight(new GUIContent(body), inner), h = pad + 26 * k + 44 * k + bh + pad;
-            GUI.DrawTexture(new Rect(x, y, w, h), panelTex);
-            GUI.DrawTexture(new Rect(x, y, 4 * k, h), Texture2D.whiteTexture, ScaleMode.StretchToFill, false, 0, new Color(0.93f, 0.74f, 0.38f), 0, 0);
-            GUI.Label(new Rect(x + pad, y + pad, inner, 26 * k), "TUTORIAL", sSection);
-            GUI.Label(new Rect(x + pad, y + pad + 26 * k, inner, 44 * k), "Tutorial complete", sTitle);
-            GUI.Label(new Rect(x + pad, y + pad + 70 * k, inner, bh), body, sBody);
+            float pad = UiTheme.G3, padY = UiTheme.G2;
+            float x = UiTheme.V(TutorialDirector.CardX + 3 + pad), inner = UiTheme.V(TutorialDirector.CardW - 3 - pad - TutorialDirector.PadR), cy = UiTheme.V(TutorialDirector.CardY + padY);
+            float th = H(sTitle, "Tutorial complete", inner), lh = H(sBody, lead, inner), rh = H(sResult, result, inner), nh = H(sBody, next, inner);
+            float h = UiTheme.V(padY + 20 + 8) + th + UiTheme.V(8 + UiTheme.RuleHeight + 16) + lh + UiTheme.V(14) + rh + UiTheme.V(14) + nh + UiTheme.V(padY);
+            TutorialDirector.CardBack(h / UiTheme.Scale);
+            UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(20)), Eyebrow, UiImgui.Styles.Eyebrow); cy += UiTheme.V(20 + 8);
+            UiTheme.Label(new Rect(x, cy, inner, th), "Tutorial complete", sTitle); cy += th + UiTheme.V(8);
+            UiTheme.Fill(new Rect(x, cy, UiTheme.V(UiTheme.RuleWidth), Mathf.Max(1, UiTheme.V(UiTheme.RuleHeight))), UiTheme.Gold); cy += UiTheme.V(UiTheme.RuleHeight + 16);
+            UiTheme.Label(new Rect(x, cy, inner, lh), lead, sBody); cy += lh + UiTheme.V(14);
+            UiTheme.Label(new Rect(x, cy, inner, rh), result, sResult); cy += rh + UiTheme.V(14);
+            UiTheme.Label(new Rect(x, cy, inner, nh), next, sBody);
         }
+        float H(GUIStyle st, string text, float width) { measure.text = text; return st.CalcHeight(measure, width); }
+        static readonly string Eyebrow = UiTheme.Spaced("Tutorial · Complete");
     }
 }

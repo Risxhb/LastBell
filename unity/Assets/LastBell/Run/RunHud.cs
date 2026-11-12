@@ -7,7 +7,7 @@ namespace LastBell.Run
     // Functional IMGUI HUD and menus for the run loop (stand-in for final UI art). Everything shown is read from the
     // live gameplay state each frame; nothing here changes rules. Hazard names are spelled out while they warn, so the
     // fight reads with audio off. Layout is in virtual 1080p units (UiTheme.R / V); styles are rebuilt per screen height.
-    public sealed class RunHud : MonoBehaviour
+    public sealed partial class RunHud : MonoBehaviour
     {
         struct FloatText { public Vector3 pos; public string text; public Color color; public float age, jx; }
         static readonly List<FloatText> floats = new List<FloatText>();
@@ -45,7 +45,7 @@ namespace LastBell.Run
         GUIStyle revealName, revealEpithet, resultPrimary, resultAction;
         GUIStyle display30, display36, display40, heading, eyebrow, eyebrowC, labelGold, bodyC, bodyL, row15, numR, numC,
                  small13, small13R, micro, microR, controls, chipSt, keySt, keyStL, cornerSt, stateSt, pill, tab, floatSt, slotName, tipSt, descSt,
-                 microC, subC, rowLabel, microHead, btn, btnP, mapBtn, microWrap, meterHead;
+                 microC, subC, rowLabel, microHead, btn, btnP, mapBtn, microWrap, meterHead, bannerSt, captionBody;
         int styleHeight = -1;
         static int menuClass;   // static: survives the scene load when the menu switches map
         public static bool ShowMeter;   // Tab
@@ -98,14 +98,10 @@ namespace LastBell.Run
             TickChip();
             TickPlayerInput();
             TickFade();
+            OverlayInput();   // Results R / M, gamepad Start (RunHud.Overlays.cs)
             var kb = Keyboard.current; if (kb == null || d == null) return;
             if (kb.tabKey.wasPressedThisFrame) ShowMeter = !ShowMeter;
             if (LanClientView) return;
-            if (d.State == RunState.Results)
-            {
-                if (kb.rKey.wasPressedThisFrame) d.RequestRetry();
-                else if (kb.mKey.wasPressedThisFrame) d.ReturnToMenu();
-            }
             if (d.State == RunState.Menu && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)) d.StartRun(RunDirector.Classes[menuClass]);
             if (d.State == RunState.Menu && (kb.leftBracketKey.wasPressedThisFrame || kb.rightBracketKey.wasPressedThisFrame))
             {
@@ -191,6 +187,8 @@ namespace LastBell.Run
             btnP = UiTheme.ButtonStyle(UiTheme.SizeNumeric, true);
             mapBtn = UiTheme.ButtonStyle(UiTheme.SizeLabel);
             microWrap = UiTheme.Style(UiTheme.SizeMicro, false, TextAnchor.UpperLeft, UiTheme.IvoryMuted, true);
+            bannerSt = UiTheme.Style(44, true, TextAnchor.MiddleCenter, UiTheme.Ivory);
+            captionBody = UiTheme.Style(UiTheme.SizeBody, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true);
             meterHead = UiTheme.Style(UiTheme.SizeMicro, true, TextAnchor.MiddleLeft, new Color(UiTheme.Gold.r, UiTheme.Gold.g, UiTheme.Gold.b, 0.6f));
         }
 
@@ -329,6 +327,7 @@ namespace LastBell.Run
                 long t = Stamp();
                 Boss(); t = Sec("boss block", t);
                 PlayerPanel(); t = Sec("player panel", t);
+                if (d.State != RunState.Results) RunPartyCards.Draw(d, Margin, UiTheme.VirtualHeight - UiTheme.G4); t = Sec("party cards", t);   // bots and LAN allies (UI/RunPartyCards.cs)
                 BannerText(); CaptionText(); t = Sec("banner + caption", t);
                 Floats(); t = Sec("floats", t);
                 Labels(); t = Sec("world labels", t);
@@ -374,28 +373,7 @@ namespace LastBell.Run
             return next + " Health refills before every fight; potions carry over until the area boss.";
         }
 
-        void ReadyCard()
-        {
-            bool practice = d.Mode == RunMode.Practice;
-            // practice shows no preparation card (Risxhb, October 25, 2026): the fight starts by itself (RunDirector.AutoReady)
-            if (practice) return;
-            if (Shop.RunShopFlow.Showing) return;   // the intermission shop replaces the preparation card
-            string eb = UiTheme.Spaced(RunDifficulty.Name(d.Difficulty));
-            string head = (practice ? "PRACTICE — " + RunDirector.Bosses[d.Encounter].Name : CampaignHead()).ToUpperInvariant();
-            string body = practice ? "Practice never advances the run." : d.EncounterOrder.Length == 1 ? "One fight: the Bellkeeper." : CampaignBody();
-            const float pad = UiTheme.G3;
-            // body clamped to 2 lines: widen the card (not the text) until it fits
-            float w = 640, twoLines = 2 * bodyC.lineHeight / UiTheme.Scale + 2;
-            while (w < 960 && Hv(bodyC, body, w - 2 * pad) > twoLines) w += 40;
-            float bh = Mathf.Min(Hv(bodyC, body, w - 2 * pad), twoLines);
-            float h = pad + 20 + 6 + 40 + 10 + bh + 20 + 44 + pad;
-            var r = Card(w, h, 168, false);   // same band as Intro / Cleared, clear of the hero
-            float y = r.y + pad;
-            T(r.x, y, w, 20, eb, eyebrowC); y += 26;
-            T(r.x, y, w, 40, head, display30); y += 50;
-            T(r.x + pad, y, w - 2 * pad, bh + 4, body, bodyC); y += bh + 20;
-            if (GUI.Button(S(r.x + w / 2 - 120, y, 240, 44), "READY  (Enter)", btnP)) d.RequestReady();
-        }
+        // ReadyCard: RunHud.Overlays.cs
 
         // ---- Souls-style boss reveal / defeat: no panel, the name large over the arena on a soft dark band ----
         GUIStyle fitSt;
@@ -609,35 +587,7 @@ namespace LastBell.Run
             if (time.Length > 0) T(0, y0 + 168, vw, 18, time, microC, A(UiTheme.IvoryMicro, UiTheme.IvoryMicro.a * a));
         }
 
-        void DownedCard()
-        {
-            const float w = 560, pad = UiTheme.G3;
-            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
-            // the last hit only if it took you to 0 and is the defeat cause; a scripted wipe (an empty tower, Severance, Last
-            // Light) downs you with its own cause, and shows its family's icon with the attack name and boss on a second line
-            // (8 Nov icons). The enrage has no family: text only.
-            var wd = d.World; BossAttackIcons.Attack ka = null; bool scripted = false;
-            if (wd != null)
-            {
-                int n = wd.TakenLog.Count;
-                if (n > 0 && wd.TakenLog[n - 1].hpAfter <= 0 && wd.TakenLog[n - 1].source == wd.LastDamageSource)
-                {
-                    ka = TakenAttack(wd, n - 1);
-                    scripted = NamesOwnCause(wd.TakenLog[n - 1].source, ka);
-                }
-                else { ka = BossAttackIcons.Get(wd.LastDamageAttackId); scripted = ka != null; }
-            }
-            var r = Card(w, pad + 44 + 8 + 26 + (scripted ? 26 : 0) + pad, 270, false, UiTheme.Danger);
-            float y = r.y + pad;
-            T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
-            var ki = BossAttackIcons.Icon(ka);
-            if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
-            string a = "Struck by ", cause = ka != null && !scripted ? ka.Label : d.DefeatCause ?? "?";
-            float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
-            T(x, y, wa + 2, 26, a, bodyL, UiTheme.Ivory);
-            T(x + wa, y, wc + 2, 26, cause, bodyL, UiTheme.Gold);
-            if (scripted) T(r.x, y + 26, w, 26, ka.Label, bodyC, UiTheme.IvoryMuted);
-        }
+        // DownedCard: RunHud.Overlays.cs
 
         // ---------------------------------------------------------------------------------------------------------
         // legacy run menu
@@ -746,165 +696,7 @@ namespace LastBell.Run
             if (GUI.Button(S(r.xMax - pad - 120, y, 120, 40), "Quit", btn)) Application.Quit();
         }
 
-        // ---------------------------------------------------------------------------------------------------------
-        // results + pause (modals)
-        // ---------------------------------------------------------------------------------------------------------
-        // Results in the menus' language: no boxes. A soft dark band, an eyebrow + rule per column, faint row dividers and
-        // text actions with the gold highlight strip (keys R / M still work).
-        // text action with the main menu's highlight strip on hover (UiImgui.Row; the Ivory .78 rest colour is this screen's own)
-        static readonly Color resultRest = new Color(UiTheme.Ivory.r, UiTheme.Ivory.g, UiTheme.Ivory.b, .78f);
-        bool StripButton(float x, float y, float w, float h, string label, GUIStyle st) => UiImgui.Row(new Rect(x, y, w, h), label, st, resultRest);
-        string Ellipsize(GUIStyle st, string t, float maxW)
-        {
-            if (Wv(st, t) <= maxW) return t;
-            while (t.Length > 1 && Wv(st, t + "…") > maxW) t = t.Substring(0, t.Length - 1);
-            return t.TrimEnd() + "…";
-        }
-        void ColumnHead(float x, float y, float w, string text, bool centred = false)
-        {
-            T(x, y, w, 20, UiTheme.Spaced(text), centred ? eyebrowC : eyebrow);
-            F(centred ? x + w / 2 - 48 : x, y + 26, 96, 2, UiTheme.Gold);
-        }
-
-        // LAN client results: the host decides Retry or Main Menu; the client can only wait or leave.
-        void LanResults()
-        {
-            Dim();
-            float vw = UiTheme.VirtualWidth, CW = 560, cx = vw / 2 - CW / 2, y = 220;
-            DrawBand(y - 120, 520, 1);
-            string head = d.Victory ? "VICTORY" : "DEFEAT";
-            T(cx, y, CW, 56, UiTheme.Spaced(head), display40, d.Victory ? UiTheme.Gold : UiTheme.Danger); y += 64;
-            F(cx + CW / 2 - 60, y, 120, 1.5f, UiTheme.Gold); y += 22;
-            const string body = "Waiting for the host to retry or leave.";
-            T(cx, y, CW, Hv(bodyC, body, CW) + 4, body, bodyC); y += 60;
-            if (StripButton(cx, y, CW, 44, "Leave session", resultAction)) LanLeave?.Invoke();
-        }
-
-        void Results()
-        {
-            Dim();
-            bool test = LastBell.Menu.MenuReturnBridge.TestSession, practice = d.Mode == RunMode.Practice;
-            var w = d.World;
-            string head = d.Victory ? (practice ? "PRACTICE CLEARED" : "VICTORY") : "DEFEAT";
-            string shown = head.Length <= 8 ? UiTheme.Spaced(head) : head;
-            string summary = d.Victory ? (practice ? "Practice result only: the run is unchanged." : d.BonusLost ? "The Bellkeeper is silenced and the run is won. The Overclocked Tempo Tyrant kept time: his card waits in Boss Rush."
-                                       : d.BonusFight ? "The Overclocked Tempo Tyrant is broken. Nothing is left to ring." : "The Bellkeeper is silenced. The run is cleared."
-                                         + (d.Difficulty == Difficulty.Hard ? "" : " Win on Hard to face the Overclocked Tempo Tyrant."))
-                                       : $"Downed by {d.DefeatCause} during {(d.Boss ? d.Boss.DisplayName : RunDirector.Bosses[d.Encounter].Name)}.";
-            float secs = d.RunTicks / 60f;
-            var rows = new List<(string, string)>
-            {
-                ("Time in combat", $"{Mathf.FloorToInt(secs / 60f)}:{Mathf.FloorToInt(secs % 60f):00}"),
-                ("Encounters cleared", d.EncountersCleared.ToString()),
-            };
-            if (w != null) { rows.Add(("Damage dealt", w.DamageDealt.ToString())); rows.Add(("Damage taken", w.DamageTaken.ToString())); }
-
-            bool recap = !d.Victory && w != null && w.TakenLog.Count > 0, meter = w != null && w.RunMeter.Count > 0;
-            const float CW = 560, SW = 400, gap = 72, rowH = 30, y0 = 200;
-            float vw = UiTheme.VirtualWidth, cx = vw / 2 - CW / 2;
-            DrawBand(y0 - 120, 860, 1);
-
-            // centre: title, rule, summary, stats, actions
-            float y = y0;
-            T(cx, y, CW, 56, shown, display40, d.Victory ? UiTheme.Gold : UiTheme.Danger); y += 64;
-            F(cx + CW / 2 - 60, y, 120, 1.5f, UiTheme.Gold); y += 22;
-            float sh = Hv(bodyC, summary, CW);
-            T(cx, y, CW, sh + 4, summary, bodyC); y += sh + 22;
-            foreach (var (k, v) in rows)
-            {
-                T(cx, y, 300, rowH, k, rowLabel);
-                T(cx, y, CW, rowH, v, numR);
-                F(cx, y + rowH - 1, CW, 1, A(UiTheme.Ivory, 0.10f));
-                y += rowH;
-            }
-            y += 30;
-            if (StripButton(cx, y, CW, 48, InputHints.Label(practice ? "Retry Practice" : "Retry Run", HintAction.Retry), resultPrimary)) d.RequestRetry();
-            y += 52;
-            if (StripButton(cx, y, CW, 44, InputHints.Label("Main Menu", HintAction.MainMenu), resultAction)) d.ReturnToMenu();
-            y += 48;
-            if (test && StripButton(cx, y, CW, 44, "Test Setup", resultAction)) LastBell.Menu.MenuReturnBridge.Return(true);
-
-            // right: damage meter, unframed, tops aligned with the title
-            if (meter) Meter(cx + CW + gap, y0 + 14, w.RunMeter, "DAMAGE · whole " + (practice ? "practice" : "run"), d.RunTicks / 60f, 0, false);
-
-            // left: death recap — the last hits in order, the killing blow marked with a Danger accent and its own label
-            if (recap)
-            {
-                int from = Mathf.Max(0, w.TakenLog.Count - 6);
-                float rx = cx - gap - SW, yy = y0 + 14;
-                ColumnHead(rx, yy, SW, "Death recap"); yy += 42;
-                T(rx, yy, SW, 18, "last hits taken, oldest first", micro, UiTheme.IvoryMicro); yy += 26;
-                const float numW = 150;   // damage, hp, time
-                int last = w.TakenLog[w.TakenLog.Count - 1].tick, hover = -1;
-                var mouse = Event.current.mousePosition;
-                for (int i = from; i < w.TakenLog.Count; i++)
-                {
-                    var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1 && e.hpAfter <= 0;
-                    // a catalogued boss attack shows its icon (40 px on the killing blow, 22 px otherwise) and "Attack · Boss";
-                    // the name always sits beside the icon, because several icons look alike at small sizes (BossAttackIcons)
-                    var at = TakenAttack(w, i); var icon = BossAttackIcons.Icon(at);
-                    float rh = fatal ? (icon != null ? 62 : 46) : 28, ty = yy + (fatal ? 18 : 0), ic = fatal ? 40 : 22, lx = rx;
-                    if (fatal) { F(rx - 12, yy + 2, SW + 12, rh - 4, A(UiTheme.Danger, 0.10f)); F(rx - 12, yy + 2, 4, rh - 4, UiTheme.Danger); T(rx, yy + 2, SW, 16, "KILLING BLOW", micro, UiTheme.Danger); }
-                    if (icon != null) { GUI.DrawTexture(S(rx, ty + (fatal ? 0 : 2), ic, ic), icon, ScaleMode.ScaleToFit, true); lx = rx + ic + 8; }
-                    string what = at != null ? at.Label : e.source;
-                    T(lx, ty, SW - numW - 8 - (lx - rx), 26, Ellipsize(small13, what, SW - numW - 8 - (lx - rx)), small13, fatal ? UiTheme.Ivory : UiTheme.IvoryBody);
-                    T(rx + SW - numW, ty, 44, 26, "-" + e.damage, small13R, fatal ? UiTheme.Danger : UiTheme.IvoryBody);
-                    T(rx + SW - numW + 46, ty, 54, 26, "hp " + e.hpAfter, small13R, UiTheme.IvoryMuted);
-                    T(rx + SW - numW + 100, ty, 50, 26, $"{(e.tick - last) / 60f:0.0}s", small13R, UiTheme.IvoryMuted);
-                    if (!fatal) F(rx, yy + rh - 1, SW, 1, A(UiTheme.Ivory, 0.08f));
-                    if (at != null && S(rx - 12, yy, SW + 12, rh).Contains(mouse)) hover = i;
-                    yy += rh;
-                }
-                if (hover < 0 && PinRecapTooltip) hover = w.TakenLog.Count - 1;
-                var ha = hover >= 0 ? TakenAttack(w, hover) : null;
-                if (ha != null) AttackTooltip(rx, yy + 12, SW, ha, $"Hit you for {w.TakenLog[hover].damage} (hp {w.TakenLog[hover].hpAfter} after){(hover == w.TakenLog.Count - 1 ? ": the killing blow." : ".")}");
-            }
-        }
-
-        // Boss attack icons in the recap (BossAttackIcons): the attack ID recorded per hit, parallel to TakenLog.
-        // PinRecapTooltip shows the killing blow's details without a mouse (autotest screenshots).
-        public static bool PinRecapTooltip;
-        // A lethal hit that names its own cause, not just its attack (a Bellkeeper Ultimate wipe: "The escapement skips (empty
-        // plate)"), keeps that text on the downed card, with its family's icon and name on the second line like a ForceDown wipe.
-        internal static bool NamesOwnCause(string source, BossAttackIcons.Attack a)
-        {
-            if (a == null || string.IsNullOrEmpty(source) || string.Equals(source, a.name, System.StringComparison.OrdinalIgnoreCase)) return false;
-            if (a.aliases != null) foreach (var al in a.aliases) if (string.Equals(source, al, System.StringComparison.OrdinalIgnoreCase)) return false;
-            return true;
-        }
-
-        static BossAttackIcons.Attack TakenAttack(CombatWorld w, int i) => i < w.TakenAttackIds.Count ? BossAttackIcons.Get(w.TakenAttackIds[i]) : null;
-
-        // Boss attack details (virtual units): the 64 px icon with the attack name, boss and tag beside it, then its shape.
-        void AttackTooltip(float x, float y, float width, BossAttackIcons.Attack a, string line)
-        {
-            const float pad = UiTheme.G2, ic = 64;
-            string body = a.shape + (string.IsNullOrEmpty(line) ? "" : "\n" + line);
-            float tw = width - 2 * pad - ic - 12, bh = Hv(descSt, body, tw), h = Mathf.Max(ic + 2 * pad, pad + 22 + 20 + bh + pad);
-            UiTheme.Frame(S(x, y, width, h), UiTheme.InkDeep, true, true);
-            F(x, y, 3, h, UiTheme.Gold);
-            var icon = BossAttackIcons.Icon(a);
-            if (icon != null) GUI.DrawTexture(S(x + pad, y + pad, ic, ic), icon, ScaleMode.ScaleToFit, true);
-            float tx = x + pad + ic + 12;
-            T(tx, y + pad, tw, 22, a.name.ToUpper(), heading);
-            T(tx, y + pad + 22, tw, 20, $"{a.bossName}   ·   {a.tag}", eyebrow);
-            T(tx, y + pad + 44, tw, bh + 4, body, descSt);
-        }
-
-        void Pause()
-        {
-            Dim();
-            bool test = LastBell.Menu.MenuReturnBridge.TestSession;
-            int nb = test ? 4 : 3;
-            const float W = 360, pad = UiTheme.G3, bh = 44, gap = 12;
-            var r = Card(W, pad + 44 + 16 + nb * bh + (nb - 1) * gap + pad, -1, true, UiTheme.Gold);
-            float y = r.y + pad, bx = r.x + pad, bw = W - 2 * pad;
-            T(r.x, y, W, 44, UiTheme.Spaced("Paused"), display30); y += 60;
-            if (GUI.Button(S(bx, y, bw, bh), "RESUME  (Esc)", btnP)) d.SetPaused(false); y += bh + gap;
-            if (GUI.Button(S(bx, y, bw, bh), d.Mode == RunMode.Practice ? "RESTART PRACTICE" : "RESTART RUN", btn)) d.RequestRetry(); y += bh + gap;
-            if (GUI.Button(S(bx, y, bw, bh), "MAIN MENU", btn)) d.ReturnToMenu(); y += bh + gap;
-            if (test && GUI.Button(S(bx, y, bw, bh), "TEST SETUP", btn)) LastBell.Menu.MenuReturnBridge.Return(true);
-        }
+        // Results, LanResults, Pause and the recap tooltip: RunHud.Overlays.cs
 
         // ---------------------------------------------------------------------------------------------------------
         // combat HUD
@@ -1035,7 +827,7 @@ namespace LastBell.Run
         // seconds), charges (corner count), empowered / combo / active states (caption, gold edge when empowered) and
         // "can't use" (dimmed icon + caption). Keybinds show only the binding for the player's current input.
         const float TileW = 64, TileH = 64, CapH = 18;
-        static bool preferMouseBasic = true, preferMouseDash = true;   // switch when the player uses the other binding
+        static bool preferMouseBasic = true;   // KeyFor: the mouse half of an "x / LMB" binding (keys now come from InputHints)
         int lastPlayerHp = -1; float playerFlash;
 
         void TickPlayerInput()
@@ -1051,7 +843,6 @@ namespace LastBell.Run
             if (d == null || d.State != RunState.Combat) return;
             var kb = Keyboard.current; var mouse = Mouse.current;
             if (mouse != null && mouse.leftButton.wasPressedThisFrame) preferMouseBasic = true;
-            if (mouse != null && mouse.rightButton.wasPressedThisFrame) preferMouseDash = true;
         }
 
         // "1 / LMB" -> the binding for the current input (current bindings have one key each); "4 hold" -> "4" plus the hold glyph
@@ -1164,16 +955,17 @@ namespace LastBell.Run
             float bx = vw / 2 - barW / 2, by = y; int hover = -1;
             for (int i = 0; i < n; i++)
             {
-                string key = KeyFor(k.SlotKeys[i], preferMouseBasic, out bool hold);
+                KeyFor(k.SlotKeys[i], preferMouseBasic, out bool hold);   // the kit says which slots are held
+                string key = InputHints.Slot(i);   // the gameplay binding table (KeyboardMouseInput.SlotKeys)
                 long tk = Stamp(); string state = k.ShownSlotState(i); float cd = k.ShownCooldown(i); Sec("player panel: kit state", tk);
                 var r = Tile(bx + i * (TileW + gap), by, key, hold, SlotIcon(p.ClassName, i), k.SlotNames[i], state, cd, off);
                 if (r.Contains(Event.current.mousePosition)) hover = i;
             }
             bool dashReady = p.Stamina >= PlayerController.DashCost;
-            var dr = Tile(bx + n * (TileW + gap), by, KeyFor("RMB", preferMouseDash, out _), false, SlotIcon(p.ClassName, n),
+            var dr = Tile(bx + n * (TileW + gap), by, InputHints.Key(HintAction.Dash), false, SlotIcon(p.ClassName, n),
                           p.ClassName == "Chimesinger" ? "Harmonic Step" : p.ClassName == "Arcanist" ? "Blink" : "Dash",
                           dashReady ? "" : "stamina", 0, off);
-            var pr = Tile(bx + (n + 1) * (TileW + gap), by, "F", false, Icon("potion"), "Potion",
+            var pr = Tile(bx + (n + 1) * (TileW + gap), by, InputHints.Key(HintAction.Potion), false, Icon("potion"), "Potion",
                           p.Potions == 0 ? "no potions" : "", 0, off, p.Potions == 0 ? null : new string('●', p.Potions) + new string('○', Mathf.Max(0, PlayerController.MaxPotions - p.Potions)));
             // the controls hint line was removed from the player HUD at Risxhb's request
             t = Sec("player panel: tiles", t);
@@ -1186,13 +978,13 @@ namespace LastBell.Run
                 // was a new text every tenth and axe state, filling Unity's text cache (perf report, Update 19:30)
                 var parts = cs.Split(new[] { "   " }, System.StringSplitOptions.RemoveEmptyEntries);
                 float total = 0; var widths = new float[parts.Length];
-                for (int i = 0; i < parts.Length; i++) { parts[i] = parts[i].Trim(); widths[i] = SegsWidth(pill, TimeSegs(parts[i])) + 20; total += widths[i] + (i > 0 ? 8 : 0); }
+                for (int i = 0; i < parts.Length; i++) { parts[i] = parts[i].Trim(); widths[i] = SegsWidth(pill, TimeSegs(parts[i])) + 23; total += widths[i] + (i > 0 ? 8 : 0); }
                 float px = vw / 2 - total / 2, py = top - 10 - 24;
                 for (int i = 0; i < parts.Length; i++)
                 {
-                    var pr2 = S(px, py, widths[i], 24);
-                    UiTheme.Fill(pr2, A(UiTheme.InkDeep, 0.6f));
-                    DrawSegs(px + 8, py, 24, TimeSegs(parts[i]), pill);   // a segment is centred in its width + 4, so +8 puts it 10 in
+                    // the main menu's small info card: ink strip, 3 px Gold left bar (UiImgui.InfoStrip), Gold label
+                    UiImgui.InfoStrip(new Rect(px, py, widths[i], 24), A(UiTheme.InkDeep, 0.8f));
+                    DrawSegs(px + 11, py, 24, TimeSegs(parts[i]), pill, UiTheme.GoldBright);   // a segment is centred in its width + 4, so +11 puts it 10 past the bar
                     px += widths[i] + 8;
                 }
             }
@@ -1202,8 +994,8 @@ namespace LastBell.Run
             var mouse = Mouse.current; bool attacking = mouse != null && (mouse.leftButton.isPressed || mouse.rightButton.isPressed);
             bool showTip = over >= 0 && !attacking && Time.unscaledTime - tipSince >= TipDelay;
             if (!showTip) { }
-            else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before each area boss.");
-            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint shares the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
+            else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [{InputHints.Key(HintAction.Potion)}]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before each area boss.");
+            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [" + InputHints.Key(HintAction.Dash) + "]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint shares the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, top, k.Tooltip(hover));
             Sec("player panel: tooltip", t);
             if (ShowMeter && d.World != null) Meter(Right - MeterW, 260, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
@@ -1271,25 +1063,35 @@ namespace LastBell.Run
         }
 
         // Aurelion v4 overlays (wipe / enrage banner, demo captions, world labels): their own plain styles
-        GUIStyle lab, ban, numStyle;
+        GUIStyle lab, numStyle;
         GUIStyle num => numStyle ?? (numStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
-        GUIStyle capT, capB;
+        // Demo caption (CaptionTitle / CaptionBody): the main menu's info card (ink strip, 3 px Gold left bar), centred above
+        // the player panel's class-state chips; Ivory heading and IvoryBody body on the theme type ramp.
+        // Narrow (640) and fading to clear on the right (critic round 1: a wide opaque box covered telegraphs).
+        const float CaptionH = 96, CaptionW = 640;
+        float CaptionTop => PanelTop - 34 - 40 - CaptionH;   // virtual; Labels keep world labels above it
         void CaptionText()
         {
             if (string.IsNullOrEmpty(CaptionTitle)) return;
-            if (capT == null) { capT = new GUIStyle(num) { fontSize = 28 }; capB = new GUIStyle(num) { fontSize = 20, wordWrap = true, fontStyle = FontStyle.Normal }; }
-            float w = Mathf.Min(1100, Screen.width - 40), x = (Screen.width - w) / 2, y = Screen.height - 330;
-            UiTheme.Fill(new Rect(x, y, w, 96), new Color(0.03f, 0.04f, 0.09f, 0.82f));
-            capT.normal.textColor = new Color(1f, 0.86f, 0.5f); UiTheme.RawLabel(new Rect(x, y + 4, w, 36), CaptionTitle, capT);
-            capB.normal.textColor = new Color(0.93f, 0.95f, 1f); UiTheme.RawLabel(new Rect(x + 16, y + 40, w - 32, 54), CaptionBody ?? "", capB);
+            float w = Mathf.Min(CaptionW, Mathf.Min(UiTheme.VirtualWidth, 1920) - 80), x = UiTheme.VirtualWidth / 2 - w / 2, y = CaptionTop;
+            UiTheme.Fill(S(x, y, w * 0.75f, CaptionH), A(UiTheme.InkDeep, 0.78f));
+            var o = GUI.color; GUI.color = new Color(1, 1, 1, 0.78f);   // the right quarter fades out (the menu's side gradient, mirrored)
+            GUI.DrawTextureWithTexCoords(S(x + w * 0.75f, y, w * 0.25f, CaptionH), UiTheme.SideGradient, new Rect(1, 0, -1, 1), true); GUI.color = o;
+            F(x, y, 3, CaptionH, UiTheme.Gold);
+            float tw = w * 0.75f - 24;   // text stays on the solid ink
+            T(x + 24, y + 12, tw, 28, CaptionTitle, heading);
+            T(x + 24, y + 44, tw, 44, CaptionBody ?? "", captionBody);
         }
 
+        // The big centre call (Aurelion wipes, the enrage warning): theme Display type in the caller's colour with the theme
+        // shadow, and the 96x2 Gold rule under it as on the main menu's titles. No band: the floor under it stays readable.
         void BannerText()
         {
             var t = CurrentBanner; if (t == null) return;
-            if (ban == null) ban = new GUIStyle(num) { fontSize = 46 };
-            ban.normal.textColor = new Color(0, 0, 0, 0.8f); UiTheme.RawLabel(new Rect(3, Screen.height * 0.3f + 3, Screen.width, 70), t, ban);
-            ban.normal.textColor = bannerColor; UiTheme.RawLabel(new Rect(0, Screen.height * 0.3f, Screen.width, 70), t, ban);
+            float vw = UiTheme.VirtualWidth, y = UiTheme.VirtualHeight * 0.3f;
+            T(2, y + 2, vw, 64, t, bannerSt, A(Color.black, 0.55f));   // a heavier 2 px shadow under the theme's own 1 px one
+            T(0, y, vw, 64, t, bannerSt, bannerColor);
+            UiImgui.Rule(vw / 2 - UiTheme.RuleWidth / 2, y + 66);
         }
         void Labels()
         {
@@ -1297,7 +1099,7 @@ namespace LastBell.Run
             if (lab == null) lab = new GUIStyle(num) { wordWrap = false, clipping = TextClipping.Overflow };   // "SUNSPOT I  II" stays on one line
             // keep labels out of the boss block, the demo caption and the screen edges (Aurelion readability A1/A3/A4): a
             // label pushed inward keeps a thin leader back to the spot it names
-            float top = d.Boss != null ? UiTheme.V(165) : 16, bottom = string.IsNullOrEmpty(CaptionTitle) ? h - UiTheme.V(150) : h - 340;
+            float top = d.Boss != null ? UiTheme.V(165) : 16, bottom = string.IsNullOrEmpty(CaptionTitle) ? h - UiTheme.V(150) : UiTheme.V(CaptionTop - 10);
             foreach (var l in labels)
             {
                 if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;

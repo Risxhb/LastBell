@@ -12,6 +12,8 @@ namespace LastBell.Run
         sealed class Step { public string Id, Section, Title; public Func<IEnumerable<int>> Run; public bool ArcanistOnly, OtherClassOnly; }
         Step[] steps;
         Step[] Steps => steps ?? (steps = BuildSteps());
+        // key names in the step text: InputHints, the gameplay bindings (KeyboardMouseInput), never hard-coded
+        static string K(HintAction a) => InputHints.Key(a);
         bool IsArcanist => Player && Player.Kit is ArcanistKit;
         bool Applies(Step s) => !(s.ArcanistOnly && !IsArcanist) && !(s.OtherClassOnly && IsArcanist);
 
@@ -104,7 +106,7 @@ namespace LastBell.Run
                     Status = "Handled. Well done!"; yield return 90; yield break;
                 }
                 current.Passed = false; current.Note = why;
-                Status = why + (t < MaxTries ? " Let's try that again." : " Moving on: replay the tutorial any time to practise it.");
+                Status = why + (t < MaxTries ? " Let's try that again." : " Moving on: replay the tutorial any time to practise it."); StatusBad = true;
                 yield return 160;
             }
         }
@@ -149,7 +151,7 @@ namespace LastBell.Run
 
         IEnumerable<int> Move()
         {
-            Show("Basics", "Move", "Walk with <b>W A S D</b>. Go and stand in the gold ring.", "");
+            Show("Basics", "Move", $"Walk with <b>{K(HintAction.Move)}</b>. Go and stand in the gold ring.", "");
             var p = Player.transform.position;
             var goal = new Vector3(p.x > 0 ? p.x - 6f : p.x + 6f, 0, Mathf.Clamp(p.z + 2f, -9f, 9f));
             SetGoal(goal, 1.2f);
@@ -159,14 +161,14 @@ namespace LastBell.Run
         }
         IEnumerable<int> Dash()
         {
-            Show("Basics", "Dash", "<b>Right-click</b> to dash 3 m toward where you're moving (the Arcanist's dash is <b>Blink</b>). It costs stamina (the bar under your health) and gives <b>no invulnerability</b>: dash out of a shape, never through it.", "");
+            Show("Basics", "Dash", $"Press <b>{K(HintAction.Dash)}</b> to dash 3 m toward where you're moving (the Arcanist's dash is <b>Blink</b>). It costs stamina (the bar under your health) and gives <b>no invulnerability</b>: dash out of a shape, never through it.", "");
             yield return 30; Snap(StepId);
             foreach (var w in Until(() => Player.Dashing || (Player.Kit is ArcanistKit a && a.Blinking))) yield return w;
             Status = "Good."; yield return 60;
         }
         IEnumerable<int> Sprint()
         {
-            Show("Basics", "Sprint", "Hold <b>Shift</b> while moving to sprint. It shares the stamina bar with your dash. There is no jump: every attack is dodged on foot. Sprint now.", "");
+            Show("Basics", "Sprint", $"Hold <b>{K(HintAction.Sprint)}</b> while moving to sprint. It shares the stamina bar with your dash. There is no jump: every attack is dodged on foot. Sprint now.", "");
             yield return 30; Snap(StepId);
             foreach (var w in Until(() => Player.Presenter.Sprinting)) yield return w;
             Status = "Good."; yield return 60;
@@ -175,7 +177,7 @@ namespace LastBell.Run
         {
             Player.DebugSetHp(55);
             int before = Player.PotionsDrunk;
-            Show("Basics", "Potions", "You're hurt. Press <b>F</b> to drink a potion: +40 health. You carry 5 per fight, one drink per second.", "");
+            Show("Basics", "Potions", $"You're hurt. Press <b>{K(HintAction.Potion)}</b> to drink a potion: +40 health. You carry 5 per fight, one drink per second.", "");
             yield return 30; Snap(StepId);
             foreach (var w in Until(() => Player.PotionsDrunk > before)) yield return w;
             Status = "Good."; yield return 60;
@@ -187,7 +189,7 @@ namespace LastBell.Run
             "A ranged caster built around <b>glyphs</b> (0 to 3, shown on your ability bar). <b>Disintegrate</b> builds glyphs; <b>Rune Sigil</b> and <b>Arcane Comet</b> spend them for full power; <b>Arcane Surge</b> cashes them all in. You have no defensive ability: your feet keep you alive.\n\nThe Tyrant will stand still while you practise.");
         IEnumerable<int> Missile()
         {
-            Show("Arcanist", "Magic Missile", "Aim at the Tyrant with the mouse. <b>Tap left-click</b> to fire a missile. Then <b>hold left-click</b> to summon up to 3 missiles and <b>release</b> to send the volley.", "");
+            Show("Arcanist", "Magic Missile", $"Aim at the Tyrant with the mouse. <b>Tap {K(HintAction.Primary)}</b> to fire a missile. Then <b>hold {K(HintAction.Primary)}</b> to summon up to 3 missiles and <b>release</b> to send the volley.", "");
             yield return 30;
             bool charged = false, shot = false;
             while (true)
@@ -202,7 +204,7 @@ namespace LastBell.Run
         }
         IEnumerable<int> Disintegrate()
         {
-            Show("Arcanist", "Disintegrate: build glyphs", "<b>Hold 2</b> and keep the beam on him. The beam has 3 steps; each step that hits him carves a <b>glyph</b>. Carve at least 2. You walk slowly while channelling.", "");
+            Show("Arcanist", "Disintegrate: build glyphs", $"<b>Hold {InputHints.Slot(1)}</b> and keep the beam on him. The beam has 3 steps; each step that hits him carves a <b>glyph</b>. Carve at least 2. You walk slowly while channelling.", "");
             yield return 30;
             bool shot = false; int beamTicks = 0;
             while (true)
@@ -210,7 +212,7 @@ namespace LastBell.Run
                 var k = Kit; if (k == null) yield break;
                 if (k.BeamActive) { beamTicks++; if (!shot && beamTicks > 70) { shot = true; Snap(StepId); } }
                 if (k.Glyphs >= 2 && !k.BeamActive) break;
-                if (!k.BeamActive && beamTicks > 0 && k.Glyphs < 2) { beamTicks = 0; Status = "Keep holding 2 and keep the beam on him. Try again when Disintegrate is ready."; }
+                if (!k.BeamActive && beamTicks > 0 && k.Glyphs < 2) { beamTicks = 0; Status = $"Keep holding {InputHints.Slot(1)} and keep the beam on him. Try again when Disintegrate is ready."; }
                 yield return 1;
             }
             Status = $"{Kit.Glyphs} glyphs. Good."; yield return 60;
@@ -218,7 +220,7 @@ namespace LastBell.Run
         IEnumerable<int> Sigil()
         {
             if (Kit.Glyphs == 0) Kit.DebugSetGlyphs(1);
-            Show("Arcanist", "Rune Sigil: spend a glyph", "Point the cursor at him and press <b>3</b>. The Rune Sigil lands under the cursor and explodes 0.8 s later. It spends 1 glyph for full power (without one it deals only 35%).", "");
+            Show("Arcanist", "Rune Sigil: spend a glyph", $"Point the cursor at him and press <b>{InputHints.Slot(2)}</b>. The Rune Sigil lands under the cursor and explodes 0.8 s later. It spends 1 glyph for full power (without one it deals only 35%).", "");
             yield return 30; Snap(StepId);
             foreach (var w in Until(() => Kit.LastSigil > 0)) yield return w;
             Status = (Kit.LastSigilPowered ? "Full power: " : "Faint (no glyph): ") + Kit.LastSigil + " damage."; yield return 75;
@@ -226,7 +228,7 @@ namespace LastBell.Run
         IEnumerable<int> Comet()
         {
             if (Kit.Glyphs == 0) Kit.DebugSetGlyphs(1);
-            Show("Arcanist", "Arcane Comet: spend a glyph", "Press <b>4</b> to mark a spot under him. The Comet falls <b>3 seconds</b> later; the bright centre hits hardest. It spends 1 glyph for full power. Long cooldown: make it count.", "");
+            Show("Arcanist", "Arcane Comet: spend a glyph", $"Press <b>{InputHints.Slot(3)}</b> to mark a spot under him. The Comet falls <b>3 seconds</b> later; the bright centre hits hardest. It spends 1 glyph for full power. Long cooldown: make it count.", "");
             yield return 30;
             int t = 0;
             while (Kit.LastComet <= 0) { if (++t == 100) Snap(StepId); yield return 1; }
@@ -234,7 +236,7 @@ namespace LastBell.Run
         }
         IEnumerable<int> Surge()
         {
-            Show("Arcanist", "Arcane Surge: cash in", "Build glyphs again with <b>Disintegrate (2)</b>, then press <b>5</b>. Surge spends <b>every</b> glyph for 2 s of power each: runes cost nothing and arm twice as fast, and missiles fly in fives. Then fire everything.", "");
+            Show("Arcanist", "Arcane Surge: cash in", $"Build glyphs again with <b>Disintegrate ({InputHints.Slot(1)})</b>, then press <b>{InputHints.Slot(4)}</b>. Surge spends <b>every</b> glyph for 2 s of power each: runes cost nothing and arm twice as fast, and missiles fly in fives. Then fire everything.", "");
             yield return 30;
             foreach (var w in Until(() => Kit.Surging)) yield return w;
             Snap(StepId);

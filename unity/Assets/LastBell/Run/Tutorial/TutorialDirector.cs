@@ -35,7 +35,9 @@ namespace LastBell.Run
         public string Section { get; private set; } = "";
         public string Title { get; private set; } = "";
         public string Body { get; private set; } = "";
-        public string Status { get; private set; } = "";      // progress / result line under the body
+        public string Status { get => status; private set { status = value; StatusBad = false; } }   // progress / result line under the body
+        string status = "";
+        public bool StatusBad { get; private set; }            // the status reports a miss (drawn in Danger, else muted gold)
         public bool WaitingForContinue { get; private set; }
         public int StepIndex { get; private set; }
         public string StepId { get; private set; } = "";
@@ -107,6 +109,9 @@ namespace LastBell.Run
         {
             var kb = Keyboard.current;
             if (kb != null && WaitingForContinue && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)) continuePressed = true;
+            // gamepad A as well, so the "Press A to continue" hint (InputHints: last device used) is true; gameplay reads no pad
+            var pad = Gamepad.current;
+            if (pad != null && WaitingForContinue && pad.buttonSouth.wasPressedThisFrame) continuePressed = true;
             UpdateMarkers();
         }
 
@@ -191,62 +196,102 @@ namespace LastBell.Run
         }
 
         // ---------------- HUD ----------------
-        GUIStyle sTitle, sBody, sSection, sStatus, sTag, sKey; float styledFor = -1;
+        // The instruction card in the main-menu language (docs/ui/ui-kit.md): a UiImgui.InfoStrip (ink strip, 3 px Gold left
+        // bar, no box), a spaced Gold eyebrow with the step count, the Ivory title and the 96x2 Gold rule, then the body in the
+        // theme's body style. Emphasis (<b> in the step text) is drawn in GoldBright rather than fake bold. Key names in the
+        // step text come from InputHints (the gameplay bindings); the continue hint follows the last device used.
+        internal const float CardX = 24, CardY = 150, CardW = 660, PadL = UiTheme.G3, PadR = 120, PadY = UiTheme.G2, CardFade = 200;
+        internal const int TitleSize = 28;   // the main menu's primary-row size: a card title, smaller than a screen title (52)
+        // Read mid-fight, so the card body is two steps above the ramp's SizeBody (17 at 1080p: ~13 px at 900p was too small).
+        internal const int BodySize = UiTheme.SizeBody + 2;
+        internal static readonly Color CardInk = new Color(UiTheme.InkDeep.r, UiTheme.InkDeep.g, UiTheme.InkDeep.b, 0.78f);
+        // The card's backing: an InfoStrip (ink + 3 px Gold left bar) whose last CardFade units fade out like the main menu's
+        // side gradient, so it reads as an ink strip over the arena rather than a box. vh: virtual height.
+        internal static void CardBack(float vh)
+        {
+            UiImgui.InfoStrip(new Rect(CardX, CardY, CardW - CardFade, vh), CardInk);
+            UiImgui.SideGradient(new Rect(CardX + CardW - CardFade, CardY, CardFade, vh), false, CardInk.a);
+        }
+        Rect cardScreen;   // where the card was drawn this pass (world tags keep out from under it)
+        GUIStyle sTitle, sBody, sStatus, sKey, sCount, sTag, sTagLarge; int styledFor = -1;
+        readonly GUIContent measure = new GUIContent();
+        string bodySource, bodyShown, eyebrowFor, eyebrow, countShown = ""; int countFor = -1, countOf = -1;
+        static string emphOpen;
         void Styles()
         {
-            float k = Screen.height / 1080f;
-            if (Mathf.Approximately(styledFor, k)) return;
-            styledFor = k;
-            sSection = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(15 * k), fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.93f, 0.74f, 0.38f) } };
-            sTitle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(28 * k), fontStyle = FontStyle.Bold, wordWrap = true, normal = { textColor = new Color(1f, 0.95f, 0.85f) } };
-            sBody = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(19 * k), wordWrap = true, richText = true, normal = { textColor = new Color(0.92f, 0.9f, 0.86f) } };
-            sStatus = new GUIStyle(sBody) { fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.62f, 0.9f, 1f) } };
-            sKey = new GUIStyle(sBody) { fontSize = Mathf.RoundToInt(16 * k), normal = { textColor = new Color(0.93f, 0.74f, 0.38f) } };
-            sTag = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(18 * k), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+            if (styledFor == Screen.height) return;
+            styledFor = Screen.height;
+            sTitle = UiTheme.Style(TitleSize, true, TextAnchor.UpperLeft, UiTheme.Ivory, true);
+            sBody = UiTheme.Style(BodySize, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true); sBody.richText = true;
+            sStatus = UiTheme.Style(BodySize, true, TextAnchor.UpperLeft, UiTheme.GoldBright, true);
+            sKey = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleLeft, UiTheme.GoldLabel);
+            sCount = UiTheme.Style(UiTheme.SizeLabel, false, TextAnchor.MiddleRight, UiTheme.IvoryMuted);
+            sTag = UiTheme.Style(EncounterCallouts.TagSize, true, TextAnchor.MiddleCenter, UiTheme.Ivory);   // as the encounter callouts
+            sTagLarge = UiTheme.Style(EncounterCallouts.TagLargeSize, true, TextAnchor.MiddleCenter, UiTheme.Ivory);   // numerals on the floor
         }
+        // the step text's <b>emphasis</b> as GoldBright (a rich-text colour: UiTheme.Label tints it with the body colour and
+        // draws the shadow pass black), cached per body string
+        string ShownBody()
+        {
+            if (ReferenceEquals(Body, bodySource)) return bodyShown;
+            emphOpen ??= "<color=#" + ColorUtility.ToHtmlStringRGB(UiTheme.GoldBright) + ">";
+            bodySource = Body; bodyShown = Body.Replace("<b>", emphOpen).Replace("</b>", "</color>");
+            return bodyShown;
+        }
+        float Height(GUIStyle st, string text, float width) { measure.text = text; return st.CalcHeight(measure, width); }
 
-        static Texture2D panelTex;
         void OnGUI()
         {
             if (Finished || W == null || !d || (d.State != RunState.Combat && d.State != RunState.Cleared && d.State != RunState.Results) || d.Paused) return;
             GUI.depth = -20;   // above RunHud (0) and encounter HUDs
             Styles();
-            if (!panelTex) { panelTex = new Texture2D(1, 1); panelTex.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.08f, 0.82f)); panelTex.Apply(); }
-            float k = Screen.height / 1080f;
+            // the instruction card: left side, below the boss bar, clear of the floor shapes in the middle (laid out in screen px)
+            if (!ReferenceEquals(eyebrowFor, Section)) { eyebrowFor = Section; eyebrow = UiTheme.Spaced("Tutorial · " + Section); }
+            if (countFor != StepNumber || countOf != StepCount) { countFor = StepNumber; countOf = StepCount; countShown = StepNumber + " / " + StepCount; }
+            string body = ShownBody(), cont = WaitingForContinue ? ContinueHint() : null;
+            float x = UiTheme.V(CardX + 3 + PadL), inner = UiTheme.V(CardW - 3 - PadL - PadR), y0 = UiTheme.V(CardY);
+            float th = Height(sTitle, Title, inner), bh = Height(sBody, body, inner), sh = Status.Length > 0 ? Height(sStatus, Status, inner) : 0;
+            // eyebrow 20, gap 8, title, gap 8, rule 2, gap 16, body, [gap 20, status], [gap 14, continue 22]
+            float h = UiTheme.V(PadY + 20 + 8) + th + UiTheme.V(8 + UiTheme.RuleHeight + 16) + bh
+                + (sh > 0 ? UiTheme.V(20) + sh : 0) + (cont != null ? UiTheme.V(14 + 22) : 0) + UiTheme.V(PadY);
+            cardScreen = new Rect(UiTheme.V(CardX), y0, UiTheme.V(CardW), h);
+            // over-head tags and floor labels (world to screen), under the card
             var cam = Camera.main;
-            // over-head tags and floor labels (world to screen)
             if (cam && d.State == RunState.Combat)
             {
-                foreach (var kv in Labels) if (kv.Key && !kv.Key.Down) WorldTag(cam, kv.Key.transform.position + Vector3.up * 3.0f, kv.Value, k);
-                foreach (var (at, text) in FloorLabels) WorldTag(cam, at + Vector3.up * 0.4f, text, k);
-                if (PlayerGoal.HasValue && GoalLabel.Length > 0) WorldTag(cam, PlayerGoal.Value + Vector3.up * 0.4f, GoalLabel, k);
+                foreach (var kv in Labels) if (kv.Key && !kv.Key.Down) WorldTag(cam, kv.Key.transform.position + Vector3.up * 3.0f, kv.Value, sTag);
+                foreach (var (at, text) in FloorLabels) WorldTag(cam, at + Vector3.up * 0.4f, text, sTagLarge);
+                if (PlayerGoal.HasValue && GoalLabel.Length > 0) WorldTag(cam, PlayerGoal.Value + Vector3.up * 0.4f, GoalLabel, sTag);
             }
-            // the instruction panel: left side, below the boss bar, clear of the floor shapes in the middle
-            float w = 560 * k, x = 24 * k, y = 150 * k, pad = 18 * k, inner = w - 2 * pad;
-            float h = pad;
-            h += sSection.CalcHeight(new GUIContent("X"), inner) + 4 * k;
-            h += sTitle.CalcHeight(new GUIContent(Title), inner) + 6 * k;
-            h += sBody.CalcHeight(new GUIContent(Body), inner) + 8 * k;
-            if (Status.Length > 0) h += sStatus.CalcHeight(new GUIContent(Status), inner) + 6 * k;
-            if (WaitingForContinue) h += sKey.CalcHeight(new GUIContent("X"), inner) + 4 * k;
-            h += pad;
-            GUI.DrawTexture(new Rect(x, y, w, h), panelTex);
-            GUI.DrawTexture(new Rect(x, y, 4 * k, h), Texture2D.whiteTexture, ScaleMode.StretchToFill, false, 0, new Color(0.93f, 0.74f, 0.38f), 0, 0);
-            float cy = y + pad;
-            string head = Finished ? "TUTORIAL" : $"TUTORIAL · {Section.ToUpperInvariant()} · {StepNumber}/{StepCount}";
-            GUI.Label(new Rect(x + pad, cy, inner, 30 * k), head, sSection); cy += sSection.CalcHeight(new GUIContent("X"), inner) + 4 * k;
-            float th = sTitle.CalcHeight(new GUIContent(Title), inner); GUI.Label(new Rect(x + pad, cy, inner, th), Title, sTitle); cy += th + 6 * k;
-            float bh = sBody.CalcHeight(new GUIContent(Body), inner); GUI.Label(new Rect(x + pad, cy, inner, bh), Body, sBody); cy += bh + 8 * k;
-            if (Status.Length > 0) { float shh = sStatus.CalcHeight(new GUIContent(Status), inner); GUI.Label(new Rect(x + pad, cy, inner, shh), Status, sStatus); cy += shh + 6 * k; }
-            if (WaitingForContinue) GUI.Label(new Rect(x + pad, cy, inner, 30 * k), "Press Enter to continue", sKey);
+            CardBack(h / UiTheme.Scale);
+            float cy = y0 + UiTheme.V(PadY);
+            UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(20)), eyebrow, UiImgui.Styles.Eyebrow);
+            UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(20)), countShown, sCount);
+            cy += UiTheme.V(20 + 8);
+            UiTheme.Label(new Rect(x, cy, inner, th), Title, sTitle); cy += th + UiTheme.V(8);
+            UiTheme.Fill(new Rect(x, cy, UiTheme.V(UiTheme.RuleWidth), Mathf.Max(1, UiTheme.V(UiTheme.RuleHeight))), UiTheme.Gold); cy += UiTheme.V(UiTheme.RuleHeight + 16);
+            UiTheme.Label(new Rect(x, cy, inner, bh), body, sBody); cy += bh;
+            if (sh > 0) { cy += UiTheme.V(20); UiTheme.Label(new Rect(x, cy, inner, sh), Status, sStatus, StatusBad ? UiTheme.Danger : UiTheme.GoldLabel); cy += sh; }
+            if (cont != null) { cy += UiTheme.V(14); UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(22)), cont, sKey); }
         }
-        void WorldTag(Camera cam, Vector3 world, string text, float k)
+        // "Press Enter to continue" / "Press A to continue", for the last device used (Update accepts both)
+        static string ContinueHint()
+        {
+            var key = InputHints.Key(HintAction.Confirm);
+            return key == "A" ? "Press A to continue" : key == "Enter" ? "Press Enter to continue" : "Press " + key + " to continue";
+        }
+        // a tag over a player or a floor spot: a small info strip (card ink, 2 px Gold left tick) in the encounter callouts' tag
+        // style; kept 16 px inside the screen, and hidden where the card covers it
+        void WorldTag(Camera cam, Vector3 world, string text, GUIStyle st)
         {
             var sp = cam.WorldToScreenPoint(world); if (sp.z <= 0) return;
-            var size = sTag.CalcSize(new GUIContent(text));
-            var r = new Rect(sp.x - size.x / 2 - 8 * k, Screen.height - sp.y - size.y / 2 - 3 * k, size.x + 16 * k, size.y + 6 * k);
-            GUI.DrawTexture(r, panelTex);
-            GUI.Label(r, text, sTag);
+            measure.text = text; var size = st.CalcSize(measure);
+            float m = UiTheme.V(16), w = size.x + UiTheme.V(20), hh = EncounterCallouts.TagHeight(st);
+            var r = new Rect(Mathf.Clamp(sp.x - w / 2, m, Screen.width - m - w), Mathf.Clamp(Screen.height - sp.y - hh / 2, m, Screen.height - m - hh), w, hh);
+            if (r.Overlaps(cardScreen)) return;
+            UiTheme.Fill(r, CardInk);
+            UiTheme.Fill(new Rect(r.x, r.y, Mathf.Max(1, UiTheme.V(2)), r.height), UiTheme.Gold);
+            UiTheme.Label(r, text, st);
         }
     }
 }

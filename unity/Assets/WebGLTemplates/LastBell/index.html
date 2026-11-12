@@ -3,36 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b101b">
-  <meta name="description" content="Play the Last Bell demo. Three classes, five arenas, and a clockwork boss rush — directly in your browser.">
+  <meta name="theme-color" content="#030407">
+  <meta name="description" content="Play the Last Bell demo. Three classes and a clockwork boss rush, directly in your browser.">
   <title>Last Bell · Play the demo</title>
+  <link rel="preload" href="assets/Inter-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/menu-scene.webp" as="image">
   <link rel="stylesheet" href="player.css">
 </head>
 <body>
-  <header><a class="title" href="./">LAST BELL</a><span>PLAYABLE DEMO</span><a href="https://github.com/Risxhb/LastBell">Project ↗</a></header>
+  <header><a class="title" href="./"><img src="assets/logo.webp" alt="Last Bell" width="720" height="310"></a><span>Playable demo</span><a class="row-link" href="https://github.com/Risxhb/LastBell">Project ↗</a></header>
   <main>
+    <div class="frame">
     <section id="player" aria-label="Last Bell game player">
       <canvas id="unity-canvas" width="1280" height="720" tabindex="0" aria-label="Last Bell. Use a keyboard and mouse to play."></canvas>
       <div id="cover">
-        <p class="eyebrow">THE HOUR IS YOURS TO BREAK</p>
-        <h1>LAST BELL</h1>
-        <p>A clockwork boss rush.</p>
-        <button id="play" type="button">Play demo</button>
-        <p id="status" role="status" aria-live="polite">The first download includes all five arenas. Desktop keyboard and mouse recommended.</p>
-        <progress id="progress" max="1" value="0" aria-label="Loading game" hidden></progress>
+        <img class="scene" src="assets/menu-scene.webp" alt="" width="1600" height="900" decoding="async">
+        <div class="column">
+          <h1><img src="assets/logo.webp" alt="Last Bell" width="720" height="310"></h1>
+          <p class="eyebrow">The hour is yours to break</p>
+          <p class="tagline">A clockwork boss rush.</p>
+          <button id="play" type="button">Play Demo</button>
+          <p id="status" role="status" aria-live="polite">The first download is about 500 MB. Desktop keyboard and mouse recommended.</p>
+          <progress id="progress" max="1" value="0" aria-label="Loading game" hidden></progress>
+          <p class="cover-footer">Browser demo <i>/</i> Work in progress</p>
+        </div>
       </div>
     </section>
+    </div>
     <div class="toolbar"><span id="hint">Tollbreaker · Chimesinger · Arcanist</span><button id="fullscreen" type="button" disabled>Fullscreen</button></div>
     <section class="news" aria-labelledby="news-title">
       <h2 id="news-title">What’s new in this demo</h2>
-      <p class="news-date">October 30, 2026</p>
-      <p class="news-lead"><strong>Aurelion</strong> and <strong>Crucivar</strong> are back much harder, Boss Rush can now start a fight in any phase, and area bosses open a <strong>shop</strong> before the fight.</p>
+      <p class="news-date">November 11, 2026</p>
+      <p class="news-lead">This demo is <strong>Boss Rush</strong>: pick an arena and a boss and fight. Every screen has been rebuilt in the main menu's style, and you can bring bot allies.</p>
       <ul class="changes">
-        <li><strong>Aurelion, mythic:</strong> four phases, much more health, and in Last Light the floor falls away into the sky.</li>
-        <li><strong>Crucivar, reworked:</strong> Bellows Draw, Gear Chain, Great Casting, Mould Press and Second Press.</li>
-        <li><strong>Start Phase:</strong> in Boss Rush, pick a boss, then the phase to start in, to practise any part of a fight.</li>
-        <li><strong>Shop:</strong> practising Aurelion, Crucivar or Sylvara opens the shop first, with 300 Chimes to spend on run items.</li>
-        <li><strong>Clearer warnings:</strong> jump hazards are a coral bar with an amber edge and a JUMP label; mechanic icons mark players and the boss panel; the death recap shows what hit you.</li>
+        <li><strong>Bosses:</strong> Tempo Tyrant, Aurelion, Crucivar, Sylvara and the Bellkeeper, on the Bellkeeper's Dais or the Metronome Court. Pick the phase to start in.</li>
+        <li><strong>Tutorial:</strong> a guided Tempo Tyrant fight teaches the basics; it is in the boss list.</li>
+        <li><strong>Bot allies:</strong> bring up to three bots into a fight; party cards show their class, health and when they need a revive.</li>
+        <li><strong>One look everywhere:</strong> pause, results, the Ready card, the HUD and tutorial prompts now match the main menu.</li>
+        <li><strong>Hit feel:</strong> hits flash and land harder, and bosses get an intro.</li>
+        <li><strong>Not in the browser demo:</strong> Start Run (the campaign), the nine minibosses and the other four arenas are greyed out here to keep the download small. They are in the full game.</li>
       </ul>
       <h3>How to play the Arcanist</h3>
       <p>The Arcanist plays around <strong>glyphs</strong>. It is a ranged glass cannon with no defensive ability, so keep moving.</p>
@@ -54,15 +63,18 @@
       <p class="news-note">Numbers in brackets, like (10), are damage. Hover over an ability in game for its tooltip.</p>
       <h3>Earlier updates</h3>
       <ul class="changes">
+        <li><strong>Aurelion and Crucivar:</strong> both reworked and much harder; in Aurelion's Last Light the floor falls away into the sky.</li>
+        <li><strong>Start Phase:</strong> in Boss Rush, pick a boss, then the phase to start in, to practise any part of a fight.</li>
+        <li><strong>Clearer warnings:</strong> jump hazards are a coral bar with an amber edge and a JUMP label; the death recap shows what hit you.</li>
         <li><strong>Tempo Tyrant:</strong> an armoured knight with a greatsword, now much harder, with Falling Hours below 10% health.</li>
         <li><strong>Pendulum Sentinel:</strong> faster, bigger swings and three charges below half health.</li>
         <li><strong>Metronome Court:</strong> finished, rising out of a sea of clouds.</li>
         <li><strong>Controls:</strong> left click attacks, right click dashes, 2–5 are class skills.</li>
       </ul>
     </section>
-    <details><summary>Controls &amp; about this demo</summary><p>Choose your class and difficulty on the main menu, then pick Boss Rush to choose an arena and a boss or miniboss to fight. Start Run (the shuffled run that ends with Bellkeeper) is greyed out in this demo while it is reworked.</p><p>Move with WASD, hold Shift to sprint and press Space to jump. Aim with the mouse. Left click for your basic attack (the Arcanist can hold it to charge missiles), 2–5 for class skills, right click to dash, F for a potion and Escape to pause.</p><p>Work in progress. Alternative Confrontation is the default main menu. Settings &gt; UI can switch to the five-arena showcase. Boss music continues between fights and crossfades during each countdown. Browser performance may vary.</p></details>
+    <details><summary>Controls &amp; about this demo</summary><p>Choose your class and difficulty on the main menu, then pick Boss Rush to choose an arena, a boss and the phase to start in. Start Run (the campaign) and the minibosses are greyed out in this demo.</p><p>Move with WASD, hold Shift to sprint and press Space to jump. Aim with the mouse. Left click for your basic attack (the Arcanist can hold it to charge missiles), 2–5 for class skills, right click to dash, F for a potion and Escape to pause.</p><p>Work in progress. Boss music continues between fights and crossfades during each countdown. Browser performance may vary.</p></details>
   </main>
-  <footer>LAST BELL <span>WORK IN PROGRESS</span></footer>
+  <footer>Last Bell <span>Work in progress</span></footer>
   <script>
     const canvas = document.getElementById('unity-canvas');
     const cover = document.getElementById('cover');

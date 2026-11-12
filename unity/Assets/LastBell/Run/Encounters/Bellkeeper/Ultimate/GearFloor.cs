@@ -703,41 +703,33 @@ namespace LastBell.Run
             for (int i = 0; i < 5; i++) { pivots[i] = null; gearR[i] = null; } for (int i = 0; i < 4; i++) meshR[i] = null;
         }
 
-        static GUIStyle nameStyle, bigStyle, midStyle;
         public void DrawGui(Camera cam)
         {
             if (!Running || cam == null || !root) return;
-            if (nameStyle == null)
-            {
-                nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                midStyle = new GUIStyle(nameStyle) { fontSize = 24 }; bigStyle = new GUIStyle(nameStyle) { fontSize = 34 };
-            }
+            var nameStyle = EncounterCallouts.Styles.Tag; var midStyle = EncounterCallouts.Styles.TagLarge;
             float t = T; int k = Mathf.Max(1, Mathf.FloorToInt(t / Slam) + 1); float left = k * Slam - t;
-            for (int g = 0; g < 4; g++) if (!launched[g]) Label(cam, GearCentre(g) + Dir(90f * g + 90) * 3.0f, 0.3f, GN[g], new Color(0.97f, 0.95f, 0.88f), midStyle);
-            for (int g = 0; g < 4; g++) if (!launched[g]) Label(cam, GearCentre(g), 1.5f, "CORE", new Color(1f, 0.85f, 0.45f), nameStyle);
+            for (int g = 0; g < 4; g++) if (!launched[g]) Label(cam, GearCentre(g) + Dir(90f * g + 90) * 3.0f, 0.3f, GN[g], UiTheme.Ivory, midStyle);
+            for (int g = 0; g < 4; g++) if (!launched[g]) Label(cam, GearCentre(g), 1.5f, "CORE", UiTheme.GoldBright, nameStyle);
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; if (p.Down) continue;
                 int tg = TargetOf(p, k, t);
-                Label(cam, p.transform.position, 2.9f, (i == 0 ? "YOU " : "") + UltimateState.Roman[HourOf(p) + 1] + "  → " + GN[tg], tg == 4 ? new Color(1f, 0.82f, 0.48f) : Color.white, nameStyle);
+                Label(cam, p.transform.position, 2.9f, (i == 0 ? "YOU " : "") + UltimateState.Roman[HourOf(p) + 1] + "  → " + GN[tg], tg == 4 ? UiTheme.GoldBright : UiTheme.Ivory, nameStyle);
             }
             if (breakMode && t < 0)
             {
                 string bt = t < -9 ? $"the floor cracks · the outer floor falls in {-9 - t:0.0}s" : t < -5 ? $"everything but the gears falls in {-5 - t:0.0}s" : t < -3 ? $"the gears lock in {-3 - t:0.0}s: be on YOUR gear" : $"the gears turn in {-t:0.0}s";
-                bigStyle.normal.textColor = t < -5 ? new Color(1f, 0.85f, 0.55f) : new Color(1f, 0.42f, 0.3f);
-                GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), "THE FLOOR BREAKS · " + bt, bigStyle); return;
+                EncounterCallouts.Banner(0.17f, "THE FLOOR BREAKS · " + bt, t < -5 ? UiTheme.GoldBright : UiTheme.Danger); return;
             }
             if (wild)
             {
                 float tw = t - wildAt; string wt = tw < 9 ? $"the gears run wild x{SpeedK(t):0.0} · the hammer every 2.5 s" : tw < WildLen ? "the gears tear loose: get to the CENTRE" : "";
-                bigStyle.normal.textColor = new Color(1f, 0.42f, 0.3f);
-                GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), "THE TRAIN RUNS WILD · " + wt, bigStyle); return;
+                EncounterCallouts.Banner(0.17f, "THE TRAIN RUNS WILD · " + wt, UiTheme.Danger); return;
             }
             var ss = SlamGears(k);
             string text = Revealed(k, t) ? $"HAMMER → {string.Join(" + ", ss.ConvertAll(g => GN[g]))} in {left:0.0}s" : $"hammer in {left:0.0}s · gear unknown" + (k % 3 == 0 ? " · TWO gears" : "");
-            bigStyle.normal.textColor = Revealed(k, t) ? new Color(1f, 0.42f, 0.3f) : new Color(1f, 0.85f, 0.7f);
-            GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), text, bigStyle);
-            if (k % Flip == 0 && Revealed(k, t)) { midStyle.normal.textColor = new Color(1f, 0.82f, 0.48f); GUI.Label(new Rect(0, Screen.height * 0.17f + 44, Screen.width, 34), "the gears reverse after this slam", midStyle); }
+            EncounterCallouts.Banner(0.17f, text, Revealed(k, t) ? UiTheme.Danger : UiTheme.Ivory);
+            if (k % Flip == 0 && Revealed(k, t)) UiTheme.Label(new Rect(0, Screen.height * 0.17f + UiTheme.V(56), Screen.width, UiTheme.V(34)), "the gears reverse after this slam", midStyle, UiTheme.GoldBright);
         }
         public string HudText(PlayerController p)
         {

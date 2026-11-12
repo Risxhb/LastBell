@@ -10,7 +10,6 @@ namespace LastBell.Run
     {
         public static bool ShowDiagnostics;
         ChimeboundOracleEncounter b;
-        GUIStyle style;
         readonly StringBuilder sb = new StringBuilder();
 
         public void Bind(ChimeboundOracleEncounter boss) { b = boss; }
@@ -25,8 +24,6 @@ namespace LastBell.Run
         {
             if (!ShowDiagnostics || !b || b.Dead) return;
             GUI.depth = 10;
-            style ??= new GUIStyle(GUI.skin.label) { fontSize = 14, richText = false };
-            style.normal.textColor = new Color(0.85f, 0.95f, 1f);
             sb.Clear();
             sb.AppendLine("[DEV] Chimebound Oracle (F7)");
             sb.AppendLine($"{(b.Phase2 ? "Phase 2" : "Phase 1")}{(b.HoldHp ? " (HP held)" : "")}{(b.Enraged ? "  LAST BELL" : "")}   {b.Clock.State} {b.Clock.Bpm:0} BPM   beat {b.Clock.Beat:0.0}");
@@ -39,7 +36,7 @@ namespace LastBell.Run
             }
             if (b.ChainActive) sb.AppendLine($"Soak chain {b.ChainIndex + 1}/{b.ChainLength}   soaked {b.Soaks}  missed {b.Misses}");
             sb.AppendLine($"Orbs live {b.OrbCount}   marks {b.ActiveMarks}   lane hits {b.LaneHits}  orb hits {b.OrbHits}");
-            GUI.Label(new Rect(16, Screen.height * 0.30f, 700, 160), sb.ToString(), style);
+            EncounterCallouts.Diagnostics(sb.ToString(), 700);
         }
     }
 }

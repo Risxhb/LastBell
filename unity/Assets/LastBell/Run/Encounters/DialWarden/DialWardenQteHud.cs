@@ -15,7 +15,7 @@ namespace LastBell.Run
     {
         public static bool ShowDiagnostics;
         DialWardenEncounter b;
-        GUIStyle letterSt, keySt, diagSt;
+        GUIStyle letterSt, keySt;
         readonly StringBuilder sb = new StringBuilder();
         static Texture2D arrow, ring;
 
@@ -133,8 +133,6 @@ namespace LastBell.Run
         // ---------------- F7 diagnostics (developer only, off by default) ----------------
         void Diagnostics()
         {
-            diagSt ??= new GUIStyle(GUI.skin.label) { fontSize = 14, richText = false };
-            diagSt.normal.textColor = new Color(0.85f, 0.95f, 1f);
             sb.Clear();
             sb.AppendLine("[DEV] Dial Warden (F7)");
             sb.AppendLine($"{(b.Phase2 ? "Phase 2" : "Phase 1")}{(b.HoldHp ? " (HP held)" : "")}{(b.Midnight ? "  MIDNIGHT" : "")}   {b.Bpm:0} BPM   block {b.Blocks}");
@@ -142,7 +140,7 @@ namespace LastBell.Run
             if (b.LapActive) sb.AppendLine($"Hand: step {b.HandSteps:0.0} {(b.Clockwise ? "cw" : "ccw")}  lit {string.Join(",", b.LitHours)}  catches {b.Catches}  misses {b.LapMisses}");
             if (b.ScalesActive) sb.AppendLine($"Scales: throw {b.Throw}/{DialWardenEncounter.Throws}  balanced {b.Balanced}  off {b.Unbalanced}");
             sb.AppendLine($"Hits  beam {b.BeamHits}  weight {b.WeightHits}  hand {b.HandHits}  break {b.BreakHits}  wave {b.WaveHits}  implode {b.ImplosionHits}");
-            GUI.Label(new Rect(16, Screen.height * 0.30f, 760, 160), sb.ToString(), diagSt);
+            EncounterCallouts.Diagnostics(sb.ToString(), 760);
         }
     }
 }

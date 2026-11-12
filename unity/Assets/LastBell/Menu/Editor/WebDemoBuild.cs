@@ -16,7 +16,11 @@ namespace LastBell.Menu.EditorTools
         [MenuItem("Last Bell/Main Menu/Build Browser Demo", priority = 33)]
         public static void Build()
         {
-            var scenes = MenuAppearance.BuildScenes;
+            // The demo is Boss Rush on two arenas, without minibosses (Risx, 11 Nov 2026): about half the download.
+            // TestRushSetup.DemoCut greys out what is left out.
+            var scenes = new[] { MainMenu.ScenePath, ConfrontationMenu.ScenePath }
+                .Concat(RunMaps.All.Where(m => DemoMaps.Contains(m.Id)).Select(m => m.RunScene)).ToArray();
+            StripForDemo();
             foreach (var scene in scenes)
                 if (!File.Exists(scene)) throw new FileNotFoundException("Required demo scene is missing: " + scene + ". Prepare generated maps first; see docs/main-menu/web-demo.md.", scene);
             if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.WebGL, BuildTarget.WebGL))
@@ -45,6 +49,46 @@ namespace LastBell.Menu.EditorTools
                 throw new InvalidOperationException("Last Bell browser build failed; see the build log.");
             PackageData(output);
             File.WriteAllText(Path.Combine(output, ".nojekyll"), "");
+        }
+
+        public static readonly string[] DemoMaps = { "test", "metronome-court" };
+        // Character folders whose Resources stay out of the demo: the nine minibosses and their props.
+        static readonly string[] ExcludedCharacters = {
+            "ChimeboundOracle", "DialWarden", "PendulumSentinel", "EscapementTick", "EscapementTock", "EscapementWheel",
+            "EscapementTwinsProps", "RivetCantor", "CrucibleSkater", "CrucibleLadle", "BriarMetronome", "SiltCarillon",
+            "SiltBell", "SiltMound", "VesperSeedkeeper" };
+
+        // Leaves the project changed (moved folders, an edited showcase scene), so it only runs in a throwaway checkout
+        // that sets LASTBELL_WEB_ISOLATED=1. Restore that checkout with git before using it for anything else.
+        static void StripForDemo()
+        {
+            if (Environment.GetEnvironmentVariable("LASTBELL_WEB_ISOLATED") != "1")
+                throw new InvalidOperationException("The browser demo build edits the project. Run it in a separate checkout with LASTBELL_WEB_ISOLATED=1; see docs/main-menu/web-demo.md.");
+            foreach (var name in ExcludedCharacters) Exclude("Assets/LastBell/Characters/" + name + "/Resources", "Assets/LastBell/Characters/" + name + "/NotInWebDemo");
+            Exclude("Assets/LastBell/Menu/Resources/Menu/WingMusic", "Assets/LastBell/Menu/NotInWebDemo");   // wing songs only play in miniboss fights
+            // The showcase scene holds every arena as a Boss Rush backdrop. Empty the ones the demo leaves out.
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(MainMenu.ScenePath);
+            var showcase = UnityEngine.Object.FindAnyObjectByType<MenuShowcase>(FindObjectsInactive.Include);
+            if (!showcase) throw new InvalidOperationException("The showcase scene has no MenuShowcase.");
+            var maps = RunMaps.Showcased;
+            for (int i = 0; i < showcase.Stages.Length && i < maps.Length; i++)
+            {
+                if (DemoMaps.Contains(maps[i].Id)) continue;
+                var env = showcase.Stages[i].Environment.transform;
+                for (int c = env.childCount - 1; c >= 0; c--) UnityEngine.Object.DestroyImmediate(env.GetChild(c).gameObject);
+                foreach (var part in env.GetComponents<Component>()) if (!(part is Transform)) UnityEngine.Object.DestroyImmediate(part);
+                showcase.Stages[i].Skybox = null;
+                Debug.Log("Last Bell browser demo: emptied showcase stage " + maps[i].Name);
+            }
+            EditorUtility.SetDirty(showcase);
+            UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+        }
+        static void Exclude(string folder, string destination)
+        {
+            if (!AssetDatabase.IsValidFolder(folder)) return;
+            var error = AssetDatabase.MoveAsset(folder, destination);
+            if (!string.IsNullOrEmpty(error)) throw new InvalidOperationException("Could not move " + folder + ": " + error);
         }
 
         [Serializable] sealed class DataManifest { public long totalBytes; public DataPart[] parts; }
