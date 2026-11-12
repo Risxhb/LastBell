@@ -52,6 +52,9 @@ namespace LastBell.Arenas.MetronomeCourt
         public Color LightTint { get; private set; }
         public bool SkyActive => skyMat && RenderSettings.skybox == skyMat;
         public int LanternPoolCount => pools.Count;
+        public float PoolGain { get; private set; }   // r4: the floor pools' level this frame (steady in every fight)
+        const float GlassBase = 0.85f, GlassGain = 0.22f, GlassFlash = 0.05f, GlassCap = 0.975f;   // r4 (B2): lantern glass emission = cream x min(cap, base + gain x chase); the flash lifts the others toward the cap
+        readonly float[] poolLo = new float[4], poolHi = new float[4]; readonly int[] poolSeen = new int[4];
         public float RodAngle { get; private set; }
         public bool ShowingCracks { get; private set; }
         public bool Preview { get; private set; }
@@ -99,7 +102,10 @@ namespace LastBell.Arenas.MetronomeCourt
         // ---- floor stone: shared tiling detail (albedo grain + a faint normal), one material per shade ----
         static Texture2D floorAlbedo, floorNormal;
         static readonly Dictionary<int, Material> floorMats = new Dictionary<int, Material>();
-        public const float FloorTile = 2.5f;   // metres per detail tile (planar UVs from Sector)
+        // r4 (November 12 critic, T1): 8 m per tile (was 2.5). The texture now carries broad painted patches 2 to 4 m across,
+        // and every slab samples it at its own offset and quarter turn, so each slab shows its own light-to-dark sweep
+        // and the variation breaks at the joints: painted slabs instead of one cloudy plate.
+        public const float FloorTile = 8f;   // metres per detail tile (planar UVs from Sector)
         static Material FloorM(Color c, float smooth = 0.18f)
         {
             int key = Mathf.RoundToInt(c.r * 255) | Mathf.RoundToInt(c.g * 255) << 8 | Mathf.RoundToInt(c.b * 255) << 16 | Mathf.RoundToInt(smooth * 15) << 24;
@@ -114,7 +120,8 @@ namespace LastBell.Arenas.MetronomeCourt
         }
         public static bool FloorDetailReady => floorAlbedo && floorNormal;
 
-        // tileable value-noise fbm: albedo around 1.0 +-6% with a few darker pits; the normal comes from the same height
+        // tileable value noise: albedo around 1.0, a broad +-6% sweep under a +-3% grain, with a few darker pits; the (unused)
+        // normal comes from the same height
         static void BuildFloorDetail()
         {
             if (floorAlbedo && floorNormal) return;
@@ -129,10 +136,14 @@ namespace LastBell.Arenas.MetronomeCourt
             for (int y = 0; y < S; y++)
                 for (int x = 0; x < S; x++)
                 {
-                    float u = x / (float)S, v = y / (float)S, n = 0, amp = 0.5f, sum = 0;
-                    for (int o = 0, p = 8; o < 3; o++, p *= 2) { n += Noise(u * p, v * p, p) * amp; sum += amp; amp *= 0.5f; }   // no finest octave: it only aliases at gameplay distance
-                    n /= sum;
-                    float pit = Noise(u * 16, v * 16, 16); if (pit > 0.86f) n -= (pit - 0.86f) * 1.25f;   // sparse pits
+                    // r4 (T1): the cloudy grain keeps its physical size (0.31 m and 0.15 m features on the 8 m tile) at half
+                    // its old strength, so its blotches no longer read across the joints; under it, two broad octaves
+                    // (4 m and 2 m features) give the slab-scale painted sweep; a few shallow pits
+                    float u = x / (float)S, v = y / (float)S;
+                    float grain = Noise(u * 26, v * 26, 26) * 0.67f + Noise(u * 52, v * 52, 52) * 0.33f;
+                    float broad = Noise(u * 2, v * 2, 2) * 0.62f + Noise(u * 4 + 3.1f, v * 4 + 1.7f, 4) * 0.38f;
+                    float n = 0.5f + (grain - 0.5f) * 0.5f + (broad - 0.5f) * 1.7f;
+                    float pit = Noise(u * 52 + 9.3f, v * 52 + 4.1f, 52); if (pit > 0.88f) n -= (pit - 0.88f) * 0.8f;   // sparse pits
                     h[y * S + x] = n;
                 }
             // the normal map comes from a 5x5 box-blurred height, so it carries only broad undulation (no specular sparkle)
@@ -144,11 +155,12 @@ namespace LastBell.Arenas.MetronomeCourt
                     hb[y * S + x] = acc / 25f;
                 }
             var alb = new Color32[S * S]; var nrm = new Color32[S * S];
+            float hMean = 0; foreach (float hv in h) hMean += hv; hMean /= h.Length;   // r4: the broad octaves have few lattice points, so their mean is not exactly 0.5; centre on it so the floor keeps its brightness
             for (int y = 0; y < S; y++)
                 for (int x = 0; x < S; x++)
                 {
                     float n = h[y * S + x];
-                    byte a = (byte)Mathf.Clamp(Mathf.RoundToInt((0.98f + (n - 0.5f) * 0.12f) * 255), 0, 255);
+                    byte a = (byte)Mathf.Clamp(Mathf.RoundToInt((0.98f + (n - hMean) * 0.12f) * 255), 0, 255);
                     alb[y * S + x] = new Color32(a, a, a, 255);
                     float dx = (hb[y * S + (x + 2) % S] - hb[y * S + (x + S - 2) % S]) * 1.5f, dy = (hb[((y + 2) % S) * S + x] - hb[((y + S - 2) % S) * S + x]) * 1.5f;   // from the blurred height
                     var nv = new Vector3(-dx, -dy, 1).normalized;
@@ -173,6 +185,19 @@ namespace LastBell.Arenas.MetronomeCourt
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
             return go.transform;
         }
+        // r4 (T2, pass 2): painted metal with no surface-kit texture. The iron texture lays its plate lines level in world
+        // space, which read as courses on the sloping metronome stiles; these parts carry their plates as geometry instead.
+        static readonly Color T2Stile = new Color(0.20f, 0.215f, 0.26f), T2Strap = new Color(0.245f, 0.26f, 0.31f), T2StileEdge = new Color(0.47f, 0.475f, 0.5f),
+            T2CaseDark = new Color(0.056f, 0.059f, 0.074f), T2Panel = new Color(0.14f, 0.147f, 0.174f);
+        static readonly Dictionary<int, Material> plainMats = new Dictionary<int, Material>();
+        static Material PlainM(Color c, float smooth, float metal = 0f)
+        {
+            int key = Mathf.RoundToInt(c.r * 255) | Mathf.RoundToInt(c.g * 255) << 8 | Mathf.RoundToInt(c.b * 255) << 16 | Mathf.RoundToInt(smooth * 15) << 24 | (metal > 0.5f ? 1 : 0) << 28;
+            if (plainMats.TryGetValue(key, out var m) && m) return m;
+            m = Prim.Material(c); m.name = "MetronomeCourt_Plain_" + key; m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", metal);
+            return plainMats[key] = m;
+        }
+
         Transform Mesh(Transform parent, Mesh mesh, Material mat, string name, Vector3 pos = default)
         {
             var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.localPosition = pos;
@@ -180,9 +205,227 @@ namespace LastBell.Arenas.MetronomeCourt
             return go.transform;
         }
 
+        // ---- r4 (T6): the coping paint atlas ----
+        // The rim ledge top was one flat band. It is now a ring of coping blocks, and each block is mapped by its own arc
+        // and width onto one cell of this atlas (u along the arc, v from the parapet side to the outer edge). Every cell
+        // carries a faint sweep, pigment patches and grain, dirt gathered against the parapet foot, a worn lighter
+        // nosing along the outer edge and a little grime at the joints. The last two cells add the soot under a lantern
+        // post: a soft dark patch round the foot of the post, washed toward the outer edge. Albedo only, outside the bound.
+        const int CopingCols = 4, CopingRows = 4, CopingCell = 128, CopingPlain = 12;   // 12 plain (cells 3 and 8 chipped) + 4 soot cells
+        const float CopingPaintMean = 0.9f, CopingR0 = 13.76f, CopingR1 = 14.97f;
+        static Texture2D copingAtlas;
+        static readonly Dictionary<int, Material> copingMats = new Dictionary<int, Material>();
+        static Material CopingM(Color c)
+        {
+            int key = Mathf.RoundToInt(c.r * 255) | Mathf.RoundToInt(c.g * 255) << 8 | Mathf.RoundToInt(c.b * 255) << 16;
+            if (copingMats.TryGetValue(key, out var m) && m) return m;
+            BuildCopingAtlas();
+            m = Prim.Material(c / CopingPaintMean); m.name = "MetronomeCourt_Coping_" + key;
+            m.SetFloat("_Smoothness", 0.14f); m.SetFloat("_Metallic", 0f);
+            m.SetTexture("_BaseMap", copingAtlas); m.SetTexture("_MainTex", copingAtlas);
+            return copingMats[key] = m;
+        }
+        static Rect CopingCellRect(int cell, bool flipU)
+        {
+            float w = 1f / CopingCols, h = 1f / CopingRows, pad = 0.5f / (CopingCols * CopingCell), padV = 0.5f / (CopingRows * CopingCell);
+            float x = (cell % CopingCols) * w + pad, y = (cell / CopingCols) * h + padV; w -= 2 * pad; h -= 2 * padV;
+            return new Rect(flipU ? x + w : x, y, flipU ? -w : w, h);
+        }
+        static void BuildCopingAtlas()
+        {
+            if (copingAtlas) return;
+            int W = CopingCols * CopingCell, H = CopingRows * CopingCell; var px = new Color32[W * H];
+            float Hash(int x, int y, int s) { uint n = (uint)(x * 374761393 + y * 668265263 + s * 1442695041); n = (n ^ (n >> 13)) * 1274126177u; return ((n ^ (n >> 16)) & 0xffff) / 65535f; }
+            float Noise(float x, float y, int s)
+            {
+                int xi = Mathf.FloorToInt(x), yi = Mathf.FloorToInt(y); float fx = x - xi, fy = y - yi; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+                return Mathf.Lerp(Mathf.Lerp(Hash(xi, yi, s), Hash(xi + 1, yi, s), fx), Mathf.Lerp(Hash(xi, yi + 1, s), Hash(xi + 1, yi + 1, s), fx), fy);
+            }
+            const float arc = 1.87f, wide = CopingR1 - CopingR0;   // a block in metres: along the arc at the post radius, and across
+            for (int cell = 0; cell < CopingCols * CopingRows; cell++)
+            {
+                var r = new System.Random(5200 + cell); float R() => (float)r.NextDouble();
+                float dir = R() * Mathf.PI * 2, amp = 0.012f + 0.016f * R(), ox = R() * 40, oy = R() * 40;
+                bool soot = cell >= CopingPlain, chipped = cell == 3 || cell == 8;
+                float stU = 0.2f + 0.6f * R(), stV = 0.3f + 0.5f * R(), stR = 0.16f + 0.1f * R(), chipS = 1.1f + 0.5f * R(), sootR = 0.22f + 0.045f * (cell - CopingPlain);   // soot ring width differs cell to cell
+                for (int y = 0; y < CopingCell; y++)
+                    for (int x = 0; x < CopingCell; x++)
+                    {
+                        float u = (x + 0.5f) / CopingCell, v = (y + 0.5f) / CopingCell;
+                        float val = 1f + amp * 2f * ((u - 0.5f) * Mathf.Cos(dir) + (v - 0.5f) * Mathf.Sin(dir));
+                        val += (Noise(u * 2.6f + ox, v * 2f + oy, cell) - 0.5f) * 0.12f;                                   // pigment patches
+                        val -= 0.07f * Mathf.Exp(-(((u - stU) * arc) * ((u - stU) * arc) + ((v - stV) * wide) * ((v - stV) * wide)) / (stR * stR * 4f));   // one broad stain
+                        val += (Noise(u * 11f + ox, v * 8f + oy, cell + 77) - 0.5f) * 0.03f;                               // grain
+                        val -= 0.2f * Edge(0.3f + 0.22f * Noise(u * 5f + ox, 2.2f, cell + 9), 0.02f, v);                 // dirt against the parapet foot
+                        val += 0.09f * Edge(0.76f + 0.1f * Noise(u * 4f + oy, 6.1f, cell + 5), 0.97f, v);                // worn nosing
+                        val -= 0.1f * Edge(0.06f + 0.06f * Noise(1.7f, v * 4f + ox, cell + 13), 0.008f, Mathf.Min(u, 1 - u));                                          // grime at the joints
+                        float warm = 0;
+                        if (soot)
+                        {   // pass 2 (critic 1: "lopsided, merges with the cast shadow"): an even ring round the plinth, about 0.5 m wide, a warm brown-black
+                            float du = (u - 0.5f) * arc, dv = (v - (PostRadius - CopingR0) / wide) * wide;
+                            float d = Mathf.Sqrt(du * du + dv * dv) + (Noise(u * 7f + ox, v * 5f + oy, cell + 31) - 0.5f) * 0.1f;
+                            warm = d < 0.3f ? 1f : Mathf.Exp(-((d - 0.3f) * (d - 0.3f)) / (sootR * sootR));
+                            val -= 0.3f * warm;   // after critic 2 ("the darkest thing on the ledge"): a core near 50, was 35
+                        }
+                        if (chipped)
+                        {   // one broken outer corner, 7 to 10 cm: a dark hollow with a pale lip
+                            float du = u * arc / (0.09f * chipS), dv = (1 - v) * wide / (0.075f * chipS);
+                            float d = Mathf.Sqrt(du * du + dv * dv) + (Noise(u * 40f + ox, v * 26f + oy, cell + 51) - 0.5f) * 0.5f;
+                            float hollow = Edge(1.1f, 0.8f, d); val += 0.06f * Edge(1.6f, 1.2f, d) * (1 - hollow) - 0.24f * hollow;
+                        }
+                        float g = Mathf.Clamp01(val * CopingPaintMean);
+                        int cx = (cell % CopingCols) * CopingCell + x, cy = (cell / CopingCols) * CopingCell + y;
+                        px[cy * W + cx] = new Color(Mathf.Clamp01(g * (1 + 0.1f * warm)), g, g * (1 - 0.16f * warm), 1f);
+                    }
+            }
+            copingAtlas = new Texture2D(W, H, TextureFormat.RGBA32, true, false) { name = "MetronomeCourt_CopingAtlas", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            copingAtlas.SetPixels32(px); copingAtlas.Apply(true, Application.isPlaying);   // readable in the editor, for the menu's baked copy
+            copingAtlas.mipMapBias = -0.5f;
+        }
+
+        // ---- r4 (T1, pass 2): the slab paint atlas ----
+        // Critic 1 on pass 1: the per-slab sweep was too weak to see, the chips were hard triangles on the spokes that read
+        // as arrowheads, and the entry path was four whole slabs tinted 21 luminance lighter, a pale wedge under the south
+        // warnings. So the paint now lives in a small atlas of slab-shaped cells, and each slab is mapped onto one cell by
+        // its own arc and radius. Every mark is soft and follows the slab: a broad light-to-dark sweep (8 to 10 luminance
+        // end to end on a third of the cells, half that on the rest), one or two soft pigment patches, a faint grain, and
+        // darker wear along the rim-side edge. Twelve cells also carry one chip at a corner: an irregular soft-edged
+        // hollow about 9% darker with a faint light lip. The last four cells belong to the four slabs beside the south
+        // spoke and add the entry path: one soft streak 1.5 m wide, painted in world space so it runs across the joints,
+        // 8 luminance at the rim and gone by the inner edge of the middle band. Albedo only: matte, no normal map, no light.
+        const int SlabCols = 8, SlabRows = 4, SlabCell = 64, SlabPlain = 16, SlabChipped = 12;   // 16 plain + 12 chipped + 4 entry-path cells
+        const float SlabPaintMean = 0.86f;   // the atlas stores paint x this, so lighter marks have headroom; SlabM divides it back out
+        static readonly int[] ChippedOuterSlabs = { 2, 5, 9, 14, 16, 21 };   // of the 24 outer slabs: uneven, not mirrored
+        static Texture2D slabAtlas;
+        static readonly Dictionary<int, Material> slabMats = new Dictionary<int, Material>();
+        static Material SlabM(Color c)
+        {
+            int key = Mathf.RoundToInt(c.r * 255) | Mathf.RoundToInt(c.g * 255) << 8 | Mathf.RoundToInt(c.b * 255) << 16;
+            if (slabMats.TryGetValue(key, out var m) && m) return m;
+            BuildFloorDetail(); BuildSlabAtlas();
+            m = Prim.Material(c / SlabPaintMean); m.name = "MetronomeCourt_Slab_" + key;
+            m.SetFloat("_Smoothness", 0.12f); m.SetFloat("_Metallic", 0f);
+            m.SetTexture("_BaseMap", slabAtlas); m.SetTexture("_MainTex", slabAtlas);
+            return slabMats[key] = m;
+        }
+        // the UV rectangle of one cell, half a texel inside its edge; a flip is a negative width or height
+        static Rect SlabCellRect(int cell, bool flipU, bool flipV)
+        {
+            float w = 1f / SlabCols, h = 1f / SlabRows, pad = 0.5f / (SlabCols * SlabCell), padV = 0.5f / (SlabRows * SlabCell);
+            float x = (cell % SlabCols) * w + pad, y = (cell / SlabCols) * h + padV; w -= 2 * pad; h -= 2 * padV;
+            return new Rect(flipU ? x + w : x, flipV ? y + h : y, flipU ? -w : w, flipV ? -h : h);
+        }
+        static void BuildSlabAtlas()
+        {
+            if (slabAtlas) return;
+            int W = SlabCols * SlabCell, H = SlabRows * SlabCell; var px = new Color32[W * H];
+            float Hash(int x, int y, int s) { uint n = (uint)(x * 374761393 + y * 668265263 + s * 1442695041); n = (n ^ (n >> 13)) * 1274126177u; return ((n ^ (n >> 16)) & 0xffff) / 65535f; }
+            float Noise(float x, float y, int s)
+            {
+                int xi = Mathf.FloorToInt(x), yi = Mathf.FloorToInt(y); float fx = x - xi, fy = y - yi; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+                return Mathf.Lerp(Mathf.Lerp(Hash(xi, yi, s), Hash(xi + 1, yi, s), fx), Mathf.Lerp(Hash(xi, yi + 1, s), Hash(xi + 1, yi + 1, s), fx), fy);
+            }
+            // threshold smoothstep (0 at e0, 1 at e1, either order). Mathf.SmoothStep(a, b, t) is an interpolation, not this.
+            float Sm(float e0, float e1, float x) { float t = Mathf.Clamp01((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); }
+            // the four entry-path slabs: (inner radius, outer radius, first angle, last angle), as in Build()
+            var pathSlabs = new[] { (9.8f, DialInner, 0f, 15f), (9.8f, DialInner, 345f, 360f), (6.6f, 9.8f, 0f, 10f), (6.6f, 9.8f, 350f, 360f) };
+            for (int cell = 0; cell < SlabCols * SlabRows; cell++)
+            {
+                var r = new System.Random(4100 + cell); float R() => (float)r.NextDouble();
+                float dir = R() * Mathf.PI * 2, amp = cell % 3 == 0 ? 0.05f + 0.012f * R() : 0.02f + 0.014f * R();   // half the end-to-end sweep
+                float ox = R() * 40, oy = R() * 40, wearSide = R();
+                bool chipped = cell >= SlabPlain && cell < SlabPlain + SlabChipped; bool chipAtRim = cell % 2 == 0;
+                float chipU = 0.06f + 0.02f * R(), chipV = chipAtRim ? 0.80f - 0.03f * R() : 0.075f + 0.02f * R(), chipSx = 0.10f + 0.04f * R(), chipSy = 0.09f + 0.04f * R();   // a rim-side chip sits just inside the tempo ring, which would cover it at the very corner
+                int path = cell - SlabPlain - SlabChipped;
+                for (int y = 0; y < SlabCell; y++)
+                    for (int x = 0; x < SlabCell; x++)
+                    {
+                        float u = (x + 0.5f) / SlabCell, v = (y + 0.5f) / SlabCell;
+                        float val = 1f + amp * 2f * ((u - 0.5f) * Mathf.Cos(dir) + (v - 0.5f) * Mathf.Sin(dir));              // the broad sweep
+                        val += (Noise(u * 2.2f + ox, v * 2.2f + oy, cell) - 0.5f) * 0.075f;                                     // one or two pigment patches
+                        val += (Noise(u * 9f + ox, v * 9f + oy, cell + 77) - 0.5f) * 0.03f;                                   // faint grain, about 30 cm
+                        float rimWear = Sm(0.06f + 0.10f * Noise(u * 5f + ox, 3.3f, cell + 9), 0f, 1f - v);      // irregular band along the rim-side edge
+                        val -= rimWear * (0.05f + 0.045f * Noise(u * 3f + oy, 7.7f, cell + 5));
+                        if (wearSide > 0.5f) val -= Sm(0.04f + 0.04f * Noise(1.1f, v * 4f + ox, cell + 3), 0f, wearSide > 0.75f ? u : 1f - u) * 0.025f;   // and down one side on half the cells
+                        float tintR = 1f, tintB = 1f;
+                        if (chipped)
+                        {
+                            float d = new Vector2((u - chipU) / chipSx, (v - chipV) / chipSy).magnitude + (Noise(u * 15f + ox, v * 15f + oy, cell + 31) - 0.5f) * 0.55f;
+                            float hollow = Sm(1.05f, 0.7f, d), lip = Sm(1.45f, 1.1f, d) * (1f - hollow);
+                            val += lip * 0.04f - hollow * 0.10f;
+                        }
+                        if (path >= 0)
+                        {
+                            var (pr0, pr1, pa0, pa1) = pathSlabs[path];
+                            float ang = Mathf.Lerp(pa0, pa1, u) * Mathf.Deg2Rad, rad = Mathf.Lerp(pr0, pr1, v), wx = Mathf.Sin(ang) * rad;
+                            float streak = Mathf.Exp(-(wx * wx) / (0.62f * 0.62f)) * Sm(6.6f, 12.2f, rad);
+                            streak *= 0.85f + 0.3f * Noise(wx * 1.3f + 5f, rad * 0.9f, 901);   // uneven, like footfall, not an airbrushed stripe
+                            val += streak * 0.07f; tintR += streak * 0.02f; tintB -= streak * 0.045f;
+                        }
+                        float g = Mathf.Clamp01(val * SlabPaintMean);
+                        int cx = (cell % SlabCols) * SlabCell + x, cy = (cell / SlabCols) * SlabCell + y;
+                        px[cy * W + cx] = new Color(Mathf.Clamp01(g * tintR), g, Mathf.Clamp01(g * tintB), 1f);
+                    }
+            }
+            slabAtlas = new Texture2D(W, H, TextureFormat.RGBA32, true, false) { name = "MetronomeCourt_SlabAtlas", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            slabAtlas.SetPixels32(px); slabAtlas.Apply(true, Application.isPlaying);   // readable in the editor, for the menu's baked copy
+            slabAtlas.mipMapBias = -0.5f;   // cells are small: stay a little sharper before neighbouring cells start to blend in the high mips
+        }
+
+        // r4 (B1): the court's big round masses. The same profile and shading as Prim's cylinder and cone (one smooth
+        // lathe, unit size, scaled by the transform), but with 180 steps instead of 28, so a 15 m rim shows no corners
+        // (2 mm of sag per facet instead of 9 cm). The seam sits at the north (-z), behind the metronome plinth. Each
+        // vertex keeps its unwrapped angle in uv.x, which BakeSurfaceUVs uses in place of atan2 (no facet of smeared
+        // texture where the angle wraps), and uv.y says whether it belongs to a cylinder's wall (1) or to a cap or cone (0).
+        // The old meshes shared their rim vertices between cap and wall, so the wall got the cap's mapping at both
+        // ends and its courses were stretched flat (B1 critic 1: "a plain smooth cylinder"). Here every profile corner
+        // is split for the mapping, with the smooth normals of the unsplit lathe, so the shading is unchanged.
+        const int RoundSteps = 180;
+        static readonly Dictionary<PrimitiveKind, Mesh> roundMeshes = new Dictionary<PrimitiveKind, Mesh>();
+        static Mesh RoundMesh(PrimitiveKind kind)
+        {
+            if (roundMeshes.TryGetValue(kind, out var cached) && cached) return cached;
+            var prof = kind == PrimitiveKind.Cone ? new[] { new Vector2(0, -0.5f), new Vector2(0.5f, -0.5f), new Vector2(0, 0.5f) }
+                                                  : new[] { new Vector2(0, -1), new Vector2(0.5f, -1), new Vector2(0.5f, 1), new Vector2(0, 1) };
+            int n = prof.Length; var v = new List<Vector3>(); var t = new List<int>(); var ang = new float[RoundSteps + 1];
+            for (int s = 0; s <= RoundSteps; s++)
+            {
+                float a = ang[s] = -Mathf.PI + 2 * Mathf.PI * s / RoundSteps, sn = Mathf.Sin(a), cs = Mathf.Cos(a);   // clockwise from +z, starting at -z
+                foreach (var p in prof) v.Add(new Vector3(p.x * sn, p.y, p.x * cs));
+            }
+            for (int s = 0; s < RoundSteps; s++)
+                for (int i = 0; i < n - 1; i++)
+                {
+                    int a0 = s * n + i, a1 = a0 + 1, b0 = (s + 1) * n + i, b1 = b0 + 1;
+                    t.Add(a0); t.Add(b0); t.Add(a1); t.Add(b0); t.Add(b1); t.Add(a1);   // faces outward
+                }
+            var smooth = new Mesh(); smooth.SetVertices(v); smooth.SetTriangles(t, 0); smooth.RecalculateNormals();
+            var nr = smooth.normals;   // the first and last rings share positions: give them one normal, so the seam does not shade
+            for (int i = 0; i < n; i++) { var avg = (nr[i] + nr[RoundSteps * n + i]).normalized; nr[i] = avg; nr[RoundSteps * n + i] = avg; }
+            if (Application.isPlaying) Destroy(smooth); else DestroyImmediate(smooth);
+            var fv = new List<Vector3>(); var fn = new List<Vector3>(); var fuv = new List<Vector2>(); var ft = new List<int>(); int per = (n - 1) * 2;
+            for (int s = 0; s <= RoundSteps; s++)
+                for (int i = 0; i < n - 1; i++)
+                {
+                    float wall = kind == PrimitiveKind.Cylinder && prof[i].x > 0 && prof[i + 1].x > 0 ? 1f : 0f;
+                    for (int k = 0; k < 2; k++) { fv.Add(v[s * n + i + k]); fn.Add(nr[s * n + i + k]); fuv.Add(new Vector2(ang[s], wall)); }
+                    if (s == RoundSteps) continue;
+                    int a0 = s * per + i * 2, a1 = a0 + 1, b0 = a0 + per, b1 = b0 + 1;
+                    ft.Add(a0); ft.Add(b0); ft.Add(a1); ft.Add(b0); ft.Add(b1); ft.Add(a1);
+                }
+            var m = new Mesh { name = "Round_" + kind }; m.SetVertices(fv); m.SetNormals(fn); m.SetUVs(0, fuv); m.SetTriangles(ft, 0); m.RecalculateBounds();
+            return roundMeshes[kind] = m;
+        }
+        Transform Round(PrimitiveKind kind, Transform parent, Vector3 pos, Vector3 scale, Material mat, Vector3? euler = null, string name = null)
+        {
+            var tr = Mesh(parent, RoundMesh(kind), mat, name ?? kind.ToString(), pos);
+            tr.localScale = scale; tr.localRotation = Quaternion.Euler(euler ?? Vector3.zero);
+            return tr;
+        }
+
         // flat-topped annular sector block (top at y = 0, `depth` deep), angles in degrees clockwise from +z. `gap` is a
         // half-joint inset applied as a parallel offset (constant width at every radius), not a constant angle.
-        static Mesh Sector(float r0, float r1, float a0, float a1, float depth, int seg = 6, float gap = 0, float bevel = 0, int uvRot = 0, Vector2 uvOff = default)
+        static Mesh Sector(float r0, float r1, float a0, float a1, float depth, int seg = 6, float gap = 0, float bevel = 0, int uvRot = 0, Vector2 uvOff = default, Rect uvCell = default)
         {
             var v = new List<Vector3>(); var t = new List<int>();
             void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d) { int i = v.Count; v.Add(a); v.Add(b); v.Add(c); v.Add(d); t.Add(i); t.Add(i + 1); t.Add(i + 2); t.Add(i); t.Add(i + 2); t.Add(i + 3); }
@@ -222,6 +465,12 @@ namespace LastBell.Arenas.MetronomeCourt
             for (int i = 0; i < v.Count; i++)
             {
                 var q = new Vector2(v[i].x, v[i].z);
+                if (uvCell.width != 0f)
+                {   // r4 (T1): the slab's own polar extent onto one atlas cell (u along the arc, v from the inner edge to the rim side)
+                    float along = Mathf.DeltaAngle(a0, Mathf.Atan2(q.x, q.y) * Mathf.Rad2Deg) / (a1 - a0), across = (q.magnitude - r0) / (r1 - r0);
+                    uv[i] = new Vector2(uvCell.x + Mathf.Clamp01(along) * uvCell.width, uvCell.y + Mathf.Clamp01(across) * uvCell.height);
+                    continue;
+                }
                 for (int k = 0; k < (uvRot & 3); k++) q = new Vector2(-q.y, q.x);
                 uv[i] = q / FloorTile + uvOff;
             }
@@ -260,7 +509,9 @@ namespace LastBell.Arenas.MetronomeCourt
         }
 
         // trapezoid prism in the XY plane (base at y = 0), centred on x, depth along z
-        static Mesh Trapezoid(float baseHalf, float topHalf, float h, float depth)
+        // `outward`: wind the faces so their normals point out of the solid. Without it the normals point in (the court-side
+        // face is lit as if it faced north), which the older parts were tuned with; r4 uses `outward` for the banner tails.
+        static Mesh Trapezoid(float baseHalf, float topHalf, float h, float depth, bool outward = false)
         {
             var p = new[] { new Vector3(-baseHalf, 0, 0), new Vector3(baseHalf, 0, 0), new Vector3(topHalf, h, 0), new Vector3(-topHalf, h, 0) };
             var v = new List<Vector3>(); var t = new List<int>();
@@ -269,6 +520,7 @@ namespace LastBell.Arenas.MetronomeCourt
             Quad(p[0], p[1], p[2], p[3]);                       // front (+z side faces the court)
             Quad(p[1] + dz, p[0] + dz, p[3] + dz, p[2] + dz);   // back
             for (int i = 0; i < 4; i++) { var a = p[i]; var b = p[(i + 1) % 4]; Quad(b, a, a + dz, b + dz); }
+            if (outward) for (int i = 0; i < t.Count; i += 3) { int x = t[i + 1]; t[i + 1] = t[i + 2]; t[i + 2] = x; }
             var m = new Mesh { name = "Trapezoid" }; m.SetVertices(v); m.SetTriangles(t, 0); m.RecalculateNormals(); m.RecalculateBounds(); return m;
         }
 
@@ -281,8 +533,15 @@ namespace LastBell.Arenas.MetronomeCourt
             var rng = new System.Random(23);
 
             // ---- combat floor: grout disc, three bands of paved wedges, dark dial border ----
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.36f, 0), new Vector3(FloorRadius * 2, 0.34f, FloorRadius * 2), StoneM(FloorGrout), name: "Grout");
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -3.6f, 0), new Vector3(FloorRadius * 2 + 1.6f, 3.0f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), name: "PlatformDrum");
+            // r4 (November 12 critic, B1): the grout disc, drum, rim ledge, ledge trim, keel and lower tier were the shared
+            // 28-step primitives round a 96 to 120-segment floor: straight chords with corners in every south-half frame
+            // (9 cm of sag per facet at the ledge). Round() builds the same profiles with 180 steps; positions, scales
+            // and top heights are unchanged (the ledge top stays at -0.06, clear of the grout: the October 26 fix).
+            // The grout disc stops 0.2 m inside the floor edge (B1 critic 2: "a new pale hairline at the south gate"). At the
+            // full 13.1 m its round wall shared a surface with the dial band's 96-segment outer wall and showed through
+            // between that wall's vertices; the 28-sided disc had hidden behind it. The joints it fills end at 12.4 m.
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.36f, 0), new Vector3(FloorRadius * 2 - 0.4f, 0.34f, FloorRadius * 2 - 0.4f), StoneM(FloorGrout), name: "Grout");
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -3.6f, 0), new Vector3(FloorRadius * 2 + 1.6f, 3.0f, FloorRadius * 2 + 1.6f), SurfM(StoneDark * 1.12f, Surface.Coursed), name: "PlatformDrum");   // r4 (T6): coursed, with drawn joints
             // gothic bays round the drum under the court (pointed dark recesses) and four teal banner drops
             for (int i = 0; i < 16; i++)
             {
@@ -320,9 +579,44 @@ namespace LastBell.Arenas.MetronomeCourt
             // October 26, 2026: the ledge top used to sit at -0.02, the same height as the grout disc's top that fills
             // every joint, so the two fought inside the joints and the joints seemed to shift while moving. It now sits at
             // -0.06, clear of the grout.
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.11f, 0), new Vector3(29.9f, 1.05f, 29.9f), StoneM(StoneDark * 1.1f), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.06
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.16f, 0), new Vector3(30.1f, 0.08f, 30.1f), M(Brass * 0.45f, 0.4f, 0.8f), name: "RimLedgeTrim");   // a band on the ledge edge, below its top (no shared surface)
-            P(PrimitiveKind.Cone, stat, new Vector3(0, -10.5f, 0), new Vector3(FloorRadius * 2 + 1.6f, 7f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), new Vector3(180, 0, 0), "PlatformKeel");
+            // r4 (November 12 critic, T6): the ledge top was "a wide flat grey band with no joints, edge moulding or grime",
+            // the drum a plain dark cylinder, and the thin brass trim "a brown wire along the edge". Now:
+            //   - the ledge wall and the drum carry coursed masonry with drawn joints;
+            //   - the top outside the parapet is a ring of coping blocks, one every 7.5 degrees (about 1.9 m), with 2 cm
+            //     joints and a 4 cm bevel, in three close stone values, each painted from the coping atlas. A lantern post
+            //     stands on the middle of every third block, and that block carries the soot under it;
+            //   - a pale stone string course under the coping replaces the brass trim;
+            //   - a drip course at the foot of the ledge wall throws a shadow line onto the top of the drum.
+            // The coping tops sit at y = 0, where the posts and bollards stand (the bare ledge at -0.06 left them 6 cm in
+            // the air). The three blocks under the bridge mouth are left out.
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.11f, 0), new Vector3(29.9f, 1.05f, 29.9f), SurfM(StoneDark * 1.38f, Surface.Coursed), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.06
+            {
+                var crng = new System.Random(61);
+                var jointShift = new float[48]; for (int k = 0; k < 48; k++) jointShift[k] = ((float)crng.NextDouble() - 0.5f) * 0.5f;   // degrees, at the joint before block k
+                for (int i = 0; i < 48; i++)
+                {
+                    float a = i * 7.5f; if (Mathf.Abs(Mathf.DeltaAngle(a, 0)) < 11f) continue;   // the bridge deck covers these
+                    bool post = i % 3 == 0 && i != 24;   // posts stand every 22.5 degrees; none at the metronome (north)
+                    int cell = post ? CopingPlain + crng.Next(4) : crng.Next(CopingPlain); bool flip = crng.Next(2) == 0;
+                    // pass 2 (critic 1: "flat fills, identical in length"): five values in an irregular order, joints shifted
+                    // up to 6 cm either way (a block stays under 2 m), and two of the twelve plain cells carry a broken corner
+                    float shade = 1.0f + 0.065f * crng.Next(5);   // after critic 2: a span of about 17 luminance (0.98 to 1.45 gave 25 to 30, "alternating light and dark panels")
+                    float j0 = jointShift[i], j1 = jointShift[(i + 1) % 48];
+                    Mesh(stat, Sector(CopingR0, CopingR1, a - 3.75f + j0, a + 3.75f + j1, 0.06f, 3, 0.01f, 0.04f, uvCell: CopingCellRect(cell, flip)), CopingM(StoneDark * shade), "Coping");
+                }
+                // the slot between the last block each side and the bridge deck (the blocks end on a radius, the deck on a straight edge)
+                foreach (float sx in new[] { -1f, 1f })
+                    P(PrimitiveKind.Cube, stat, new Vector3(sx * 2.775f, -0.034f, 14.08f), new Vector3(0.25f, 0.06f, 1.16f), StoneM(StoneDark * 1.2f), name: "CopingMouthFill");   // top 4 mm under the block tops
+            }
+            // One plain band, 9 cm proud of the wall, under the coping (no shared surface). Pass 2 tried a moulded profile (a
+            // fillet, a band and a dark throat); critic 2 found its grooves about 1 px wide in the player, broken into dashes,
+            // the "thin repeated trim that crawls". No line under 2 px at the fight camera, so the band stays plain.
+            // The three courses are rings, not discs: a full disc under the court is a whole extra layer for the renderer to
+            // shade behind the floor (pass 2 had five such discs and ran the fight at about 152 fps; as rings it runs at 186).
+            Mesh(stat, Sector(14.9f, 15.08f, 0, 360, 0.22f, 180), StoneM(Color.Lerp(StoneDark, Ivory, 0.55f)), "RimStringCourse", new Vector3(0, -0.08f, 0));
+            Mesh(stat, Sector(14.9f, 15.15f, 0, 360, 0.22f, 180), StoneM(StoneDark * 1.3f), "RimDripCourse", new Vector3(0, -1.96f, 0));   // 0.2 m proud at the foot of the ledge wall
+            Mesh(stat, Sector(13.85f, 13.98f, 0, 360, 0.3f, 180), StoneM(StoneDark * 1.25f), "DrumSillCourse", new Vector3(0, -5.15f, 0));   // pass 2: one course round the drum at the bay sills, which stand proud of it
+            Round(PrimitiveKind.Cone, stat, new Vector3(0, -10.5f, 0), new Vector3(FloorRadius * 2 + 1.6f, 7f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), new Vector3(180, 180, 0), "PlatformKeel");   // point down; the extra half turn keeps the texture seam at the north
             // one calm stone family with a wider +-7% jitter on a darker base (keeps telegraph contrast), a shared grain
             // detail, bevelled slab edges, and 1 in 12 slabs weathered (darker, with a damp sheen)
             // October 27: one cool limestone family; a narrower jitter so the disc stops reading as alternating pie wedges
@@ -332,14 +626,18 @@ namespace LastBell.Arenas.MetronomeCourt
             Material Shade(bool inner, int outerIndex = -1)
             {
                 float k = inner ? 0.97f : 1f;
-                if (rng.Next(12) == 0) return FloorM(FloorStone * 0.95f * k, 0.18f);
-                var m = FloorM(FloorStone * jitter[rng.Next(jitter.Length)] * k);
+                // the same random draws as before (one, or two when the slab is not weathered), so later placements hold
+                Color c = rng.Next(12) == 0 ? FloorStone * 0.95f * k : FloorStone * jitter[rng.Next(jitter.Length)] * k;
                 // pass 4 (final critic: wear should gather at the rim as lighter, warmer pigment): the outer band leans warm and
                 // its worn slabs are a step lighter; the middle band is unchanged, so the wear fades out by mid-radius
-                var worn = Color.Lerp(FloorStone, StoneWarm, 0.3f);
                 // (pass-4 critic: the separately lighter worn slabs read as hard-edged patchwork, so they now differ by 2 % only)
-                if (outerIndex >= 0) m = (outerIndex * 7) % 5 == 1 ? FloorM(Color.Lerp(FloorStone, StoneWarm, 0.45f) * 1.02f, 0.18f) : FloorM(worn * (outerIndex % 2 == 0 ? 0.99f : 1.005f));
-                return m;
+                // r4 (T1 critic 1: "the outer band is still a two-tone patchwork", 93 against 120): every outer slab now comes
+                // from the warm worn family, within 1.5% of each other. A 1-in-12 weathered slab used to keep the cool dark
+                // stone here, 20-odd luminance under its neighbours. The family is 3% lower, so the band sits about 6 over
+                // the inner band instead of 9.
+                if (outerIndex >= 0)
+                    c = (outerIndex * 7) % 5 == 1 ? Color.Lerp(FloorStone, StoneWarm, 0.4f) * 0.985f : Color.Lerp(FloorStone, StoneWarm, 0.3f) * 0.97f * (outerIndex % 2 == 0 ? 0.992f : 1.008f);
+                return SlabM(c);
             }
             const float gap = 0.025f, bevel = 0.04f;   // 4 cm: wide enough to span pixels (a 2 cm facet crawled when moving)   // half-joint: joints are a constant 0.05 m everywhere
             Mesh(stat, Sector(0, 2.6f, 0, 360, 0.3f, 48, gap, bevel), FloorM(FloorStone * 0.97f), "FloorCentre");
@@ -350,7 +648,22 @@ namespace LastBell.Arenas.MetronomeCourt
                 for (int i = 0; i < count; i++)
                 {
                     float span = 360f / count, a0 = off + i * span;
-                    Mesh(stat, Sector(r0, r1, a0, a0 + span, 0.3f, 6, gap, bevel, rng.Next(4), new Vector2((float)rng.NextDouble(), (float)rng.NextDouble())), Shade(r0 < 3f, r0 > 9f ? i : -1), "Slab");
+                    // r4 (T1, pass 2): each slab is mapped onto one painted cell of the slab atlas (BuildSlabAtlas). The three
+                    // draws that used to turn and shift the shared noise now pick the cell and its flips, so the random
+                    // sequence is unchanged. Outer slabs keep their rim side up (the wear is painted there); six of them,
+                    // unevenly spaced, take a chipped cell, turned so the chip lies at the corner away from the hour spoke.
+                    // The four slabs beside the south spoke in the outer and middle bands take the entry-path cells.
+                    int turn = rng.Next(4); float pick = (float)rng.NextDouble(); rng.NextDouble();
+                    bool outerBand = r0 > 9f, middleBand = !outerBand && r0 > 6f, pathSlab = (outerBand || middleBand) && (i == 0 || i == count - 1);
+                    int cell = Mathf.Min(SlabPlain - 1, (int)(pick * SlabPlain)); bool flipU = (turn & 1) == 1, flipV = (turn & 2) == 2;
+                    if (pathSlab) { cell = SlabPlain + SlabChipped + (outerBand ? 0 : 2) + (i == 0 ? 0 : 1); flipU = flipV = false; }
+                    else if (outerBand)
+                    {
+                        flipV = false;
+                        if (System.Array.IndexOf(ChippedOuterSlabs, i) is int chipAt && chipAt >= 0) { cell = SlabPlain + chipAt * 2 % SlabChipped; flipU = i % 2 == 0; }
+                    }
+                    var slabMesh = Sector(r0, r1, a0, a0 + span, 0.3f, 6, gap, bevel, uvCell: SlabCellRect(cell, flipU, flipV));
+                    Mesh(stat, slabMesh, Shade(r0 < 3f, outerBand ? i : -1), "Slab");
                 }
             // hairline cracks removed (October 25, 2026): 2.5 cm strips are sub-pixel at gameplay distance and crawled when
             // the camera moved. The random draws they used are kept so every later random choice stays the same.
@@ -433,7 +746,8 @@ namespace LastBell.Arenas.MetronomeCourt
                 if (Mathf.Abs(Mathf.DeltaAngle(a, 0)) < 5f || Mathf.Abs(Mathf.DeltaAngle(a, 180)) < 5f) continue;   // bridge gap; never in front of the metronome
                 Post(stat, root, Quaternion.Euler(0, a, 0) * Vector3.forward * PostRadius, a);
             }
-            foreach (var s in new[] { -1, 1 }) Post(stat, root, new Vector3(3.15f * s, 0, PostRadius), 0);   // clear of the bridge newels
+            // r4 (November 12 critic, B6): the two court-mouth bollards are gone. Each stood 0.7 m from a bridge newel, so
+            // each side of the entry showed two capped posts side by side. The newel now carries the lantern (below).
             BuildSwags(stat);
 
             // ---- south entry bridge (decorative approach; not part of the combat bound) ----
@@ -441,8 +755,9 @@ namespace LastBell.Arenas.MetronomeCourt
             // an ivory border course inside each curb, running-bond paving with a brass cross-joint every five rows
             P(PrimitiveKind.Cube, stat, new Vector3(0, -0.41f, 21f), new Vector3(5.3f, 0.7f, 15f), StoneM(FloorGrout), name: "BridgeDeck");
             P(PrimitiveKind.Cube, stat, new Vector3(0, 0.04f, 13.8f), new Vector3(4.6f, 0.08f, 0.45f), StoneM(Ivory), name: "BridgeSill");
-            P(PrimitiveKind.Cube, stat, new Vector3(0, 0.03f, 14.04f), new Vector3(4.6f, 0.06f, 0.03f), BrassM, name: "BridgeSillNosing");
+            P(PrimitiveKind.Cube, stat, new Vector3(0, 0.03f, 14.04f), new Vector3(4.6f, 0.06f, 0.03f), M(BrassInlay, 0.45f, 0.8f), name: "BridgeSillNosing");   // r4 (T8): the dull inlay brass of the cross-joints (bright brass here was the last long warm line in the south fight view)
             const float paveZ0 = 14.08f, pave = 1.15f, paveHalf = 2.03f;
+            var paveRng = new System.Random(977); int lastPick = -1;   // r4 (T8): each slab's own tone
             for (int row = 0; row < 12; row++)
             {
                 float pz = paveZ0 + pave * 0.5f + row * pave, off = row % 2 == 0 ? 0f : pave * 0.5f;   // running bond
@@ -450,15 +765,22 @@ namespace LastBell.Arenas.MetronomeCourt
                 {
                     float l = Mathf.Max(x0, -paveHalf), r = Mathf.Min(x0 + pave, paveHalf);
                     if (r - l < 0.2f) continue;
-                    int pick = Mathf.Abs(Mathf.RoundToInt(x0 * 7 + row * 3)) % 4;
+                    // Pass 2 (critic 1: slabs of one family were within 1 luminance of each other and each course took
+                    // one step, "bands plus a centre stripe"): every slab draws its own tone from five, never its neighbour's
+                    int pick = paveRng.Next(5); if (pick == lastPick) pick = (pick + 1 + paveRng.Next(4)) % 5; lastPick = pick;
                     // October 27 pass 3: textured paving (surface kit) with a warmer, worn centre path
                     var paveC = Mathf.Abs((l + r) / 2) < 1.2f ? new Color(0.53f, 0.50f, 0.46f) : new Color(0.46f, 0.46f, 0.47f);
                     // pass 4 (critic: "blocky, hard-stepped patches"): a soft paving texture, gentler value steps between slabs
-                    var slab = row % 5 == 3 && pick == 1 ? PavingM(paveC * 0.9f) : PavingM(paveC * new[] { 0.96f, 1.0f, 1.03f, 0.985f }[pick]);
-                    P(PrimitiveKind.Cube, stat, new Vector3((l + r) / 2, -0.05f, pz), new Vector3(r - l - 0.05f, 0.1f, pave - 0.05f), slab, name: "BridgeSlab");
+                    // r4 (November 12 critic, T8: "the paving texture barely reads (large flat light squares)"): wider steps
+                    // from slab to slab (were within 7%), over a paving texture that now carries real stains
+                    var slab = PavingM(paveC * new[] { 0.85f, 0.92f, 1.0f, 1.08f, 1.16f }[pick]);
+                    P(PrimitiveKind.Cube, stat, new Vector3((l + r) / 2, -0.05f, pz), new Vector3(r - l - 0.035f, 0.1f, pave - 0.035f), slab, name: "BridgeSlab");   // r4 (T8): 3.5 cm joints (were 5)
                 }
                 if (row % 5 == 4) P(PrimitiveKind.Cube, stat, new Vector3(0, 0.003f, pz + pave * 0.5f), new Vector3(paveHalf * 2, 0.006f, 0.04f), M(BrassInlay, 0.45f, 0.8f), name: "BridgeBrassJoint");
             }
+            // r4 (T8): a cool grey joint fill 5 mm under the slab tops. (Pass 1's was darker and 1 cm down: "a black grid"
+            // behind the HUD, critic 1. Before that the joints showed the deck 6 cm down.)
+            P(PrimitiveKind.Cube, stat, new Vector3(0, -0.03f, paveZ0 + pave * 6f), new Vector3(paveHalf * 2, 0.05f, pave * 12f), StoneM(FloorGrout * 0.8f), name: "BridgeJointFill");
             P(PrimitiveKind.Cube, stat, new Vector3(0, -0.05f, 28.22f), new Vector3(4.06f, 0.1f, 0.5f), StoneM(Ivory * 0.92f), name: "BridgeEndCourse");
             for (int s = -1; s <= 1; s += 2)
             {
@@ -472,24 +794,61 @@ namespace LastBell.Arenas.MetronomeCourt
                     Mesh(stat, Frustum(0.06f, 0.06f, 0.045f, 0.045f, 0.42f), StoneM(Ivory), "BridgeBaluster", new Vector3(rx, 0.12f, bz));
                 }
                 P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.58f, 21.4f), new Vector3(0.16f, 0.08f, 13.8f), StoneM(Ivory), name: "BridgeRail");
-                P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.635f, 21.4f), new Vector3(0.18f, 0.03f, 13.8f), M(Brass * 0.7f, 0.5f, 0.8f), name: "BridgeRailCap");
+                P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.635f, 21.4f), new Vector3(0.23f, 0.03f, 13.8f), StoneM(new Color(0.5f, 0.495f, 0.48f)), name: "BridgeRailCap");   // r4 (T8): stone (the brass caps were "long orange-brown planks", the strongest warm line by the HUD); brass stays on the post caps. Pass 2: a cooler, darker stone than the rail, overhanging it by 3.5 cm a side (critic 1: "one ivory band")
                 // a low newel ends each rail at the court (under 0.8 m: never hides a player)
                 // pass 6 (Risxhb: the brass post caps "look basic"): each post gets a plinth course, a sunk panel on its two
                 // long faces, an ivory cornice slab that overhangs the shaft, and a stepped brass cap. The rail posts also carry
                 // a brass ball finial; the newel at the court mouth stays under 0.8 m, so it has no ball.
-                var capBrass = M(Brass * 0.6f, 0.4f, 0.8f); var sunk = StoneM(Ivory * 0.78f);
-                void PostKit(Vector3 baseAt, float half, float height, bool ball, string nm)
+                // r4 (B6 critic 1: "the brass still renders rust-chocolate"): painted aged brass, not metallic. The metal mirrored
+                // the dusk sky and came out near 53,31,12 on the finial balls.
+                // after critic 2: the pylon panels are a lifted blue charcoal (StoneDark x 0.85 crushed to warm black, 26,20,19)
+                var capBrass = SurfM(Brass * 0.8f, Surface.Brass, 0.35f); var sunk = StoneM(Ivory * 0.78f); var panelDark = StoneM(new Color(0.25f, 0.28f, 0.37f));
+                // railSide: +1 or -1 when the bridge rail butts into the post's +z or -z face (that face stays plain stone)
+                void PostKit(Vector3 baseAt, float half, float height, bool ball, string nm, float railSide = 0)
                 {
                     P(PrimitiveKind.Cube, stat, baseAt + Vector3.up * height / 2, new Vector3(half * 2, height, half * 2), StoneM(Ivory), name: nm);
                     P(PrimitiveKind.Cube, stat, baseAt + Vector3.up * 0.06f, new Vector3(half * 2 + 0.08f, 0.12f, half * 2 + 0.08f), StoneM(Ivory * 0.9f), name: nm + "Plinth");
                     foreach (var sx in new[] { -1f, 1f })
-                        P(PrimitiveKind.Cube, stat, baseAt + new Vector3(sx * (half + 0.004f), height * 0.52f, 0), new Vector3(0.02f, height * 0.5f, half * 1.2f), sunk, name: nm + "Panel");
+                        P(PrimitiveKind.Cube, stat, baseAt + new Vector3(sx * (half + 0.004f), height * 0.52f, 0), new Vector3(0.02f, height * 0.5f, half * 1.2f), ball ? sunk : panelDark, name: nm + "Panel");
+                    if (!ball)
+                    {
+                        // r4 (B6 critic 1: "a lamp set on a gatepost, in a different kit from the banded rim bollards"): the
+                        // entry pylon takes the bollards' vocabulary. A dark chamfered base one step wider, a dark sunk panel
+                        // with a brass diamond boss on all four faces, and a brass band under the cornice. Mass, not height.
+                        // after critic 2 ("a dark slab under the newel base reads as a detached shadow plate"): the base is a
+                        // step narrower and runs 7 cm down past the deck top (-0.06), so it bears on the deck instead of
+                        // hovering over it; and the face the rail butts into has no panel or boss (half a brass diamond
+                        // poked out beside the rail end).
+                        Mesh(stat, Frustum(half + 0.08f, half + 0.08f, half + 0.055f, half + 0.055f, 0.14f), StoneM(StoneDark * 1.25f), nm + "Base", baseAt + Vector3.down * 0.07f);
+                        foreach (var sz in new[] { -1f, 1f })
+                            if (sz != railSide) P(PrimitiveKind.Cube, stat, baseAt + new Vector3(0, height * 0.52f, sz * (half + 0.004f)), new Vector3(half * 1.2f, height * 0.5f, 0.02f), panelDark, name: nm + "Panel");
+                        foreach (var (dx, dz) in new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) })
+                            if (dz == 0 || dz != railSide) P(PrimitiveKind.Cube, stat, baseAt + new Vector3(dx * (half + 0.014f), height * 0.52f, dz * (half + 0.014f)), new Vector3(0.09f, 0.09f, 0.025f), capBrass, new Vector3(0, dx != 0 ? 90f : 0f, 45f), nm + "Boss");
+                        Mesh(stat, Frustum(half + 0.014f, half + 0.014f, half + 0.014f, half + 0.014f, 0.045f), capBrass, nm + "Band", baseAt + Vector3.up * (height - 0.075f));
+                    }
                     Mesh(stat, Frustum(half + 0.05f, half + 0.05f, half + 0.05f, half + 0.05f, 0.05f), StoneM(Ivory * 0.92f), nm + "Cornice", baseAt + Vector3.up * height);
-                    Mesh(stat, Frustum(half + 0.01f, half + 0.01f, half - 0.03f, half - 0.03f, 0.035f), capBrass, nm + "CapBand", baseAt + Vector3.up * (height + 0.05f));
-                    Mesh(stat, Frustum(half - 0.03f, half - 0.03f, 0.05f, 0.05f, ball ? 0.13f : 0.07f), capBrass, nm + "Cap", baseAt + Vector3.up * (height + 0.085f));
-                    if (ball) P(PrimitiveKind.Sphere, stat, baseAt + Vector3.up * (height + 0.27f), Vector3.one * 0.13f, capBrass, name: nm + "Ball");
+                    // r4 (B6): the full brass caps rendered as big dark rust pyramids, the darkest warm mass beside the HUD.
+                    // A rail post now ends in a stone weathering band and a stone pyramid under a small brass ball. The newel
+                    // at the court mouth is the entry pylon: a low brass plinth and the lantern the mouth bollard used to
+                    // carry (the same lantern height as the rim bollards, so the near side stays low).
+                    Mesh(stat, Frustum(half + 0.01f, half + 0.01f, half - 0.03f, half - 0.03f, 0.035f), StoneM(Ivory * 0.84f), nm + "CapBand", baseAt + Vector3.up * (height + 0.05f));
+                    if (ball)
+                    {
+                        // pass 2: a stepped fillet under the pyramid (the bare pyramid on a thin slab read plain), a larger ball
+                        Mesh(stat, Frustum(half - 0.03f, half - 0.03f, half - 0.06f, half - 0.06f, 0.035f), StoneM(Ivory * 0.96f), nm + "CapFillet", baseAt + Vector3.up * (height + 0.085f));
+                        Mesh(stat, Frustum(half - 0.075f, half - 0.075f, 0.04f, 0.04f, 0.13f), StoneM(Ivory * 0.9f), nm + "Cap", baseAt + Vector3.up * (height + 0.12f));
+                        P(PrimitiveKind.Sphere, stat, baseAt + Vector3.up * (height + 0.305f), Vector3.one * 0.13f, capBrass, name: nm + "Ball");
+                    }
+                    else
+                    {
+                        Mesh(stat, Frustum(0.2f, 0.2f, 0.16f, 0.16f, 0.05f), capBrass, nm + "LanternPlinth", baseAt + Vector3.up * (height + 0.085f));
+                        Lantern(root, baseAt + Vector3.up * (height + 0.335f), 0.75f);
+                    }
                 }
-                PostKit(new Vector3(rx, 0, 14.55f), 0.25f, 0.62f, false, "BridgeNewel");
+                PostKit(new Vector3(rx, 0, 14.55f), 0.25f, 0.62f, false, "BridgeNewel", 1f);
+                // pass 2 (B6 critic 1: "the outer bridge end keeps the old crowding"): the far end gets the same lantern pylon
+                // in place of a loose bollard standing against the rail's end
+                PostKit(new Vector3(rx, 0, 28.1f), 0.25f, 0.62f, false, "BridgeEndNewel", -1f);
                 for (int k = 1; k < 4; k++)
                     PostKit(new Vector3(rx, 0, 13.9f + k * 3.75f), 0.21f, 0.66f, true, "BridgePost");
                 // piers with stone arches on the outer faces, and a dark recessed spandrel wall behind them so they silhouette
@@ -507,8 +866,7 @@ namespace LastBell.Arenas.MetronomeCourt
                     }
                 }
             }
-            // lanterns at the far end of the bridge (bollard kit)
-            foreach (var sx in new[] { -1, 1 }) Post(stat, root, new Vector3(2.45f * sx, 0, 28.1f), 0);
+            // (the far end's lanterns now sit on the end newels above; they were two more bollards)
 
             // ---- north plinth and the independent giant metronome ----
             var m = new GameObject("Metronome (arena object)").transform; m.SetParent(root, false); m.localPosition = new Vector3(0, 0, MetronomeZ);
@@ -545,10 +903,11 @@ namespace LastBell.Arenas.MetronomeCourt
                 Tower(stat, bellPos, 30f, 6f, rng, true);
             }
             P(PrimitiveKind.Cone, stat, new Vector3(0, -62, 0), new Vector3(300, 50, 300), M(Abyss, 0.1f), new Vector3(180, 0, 0), "AbyssBowl");
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -8.5f, 0), new Vector3(FloorRadius * 2 + 4f, 1.5f, FloorRadius * 2 + 4f), StoneM(StoneDark * 0.75f), name: "LowerTier");
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -8.5f, 0), new Vector3(FloorRadius * 2 + 4f, 1.5f, FloorRadius * 2 + 4f), StoneM(StoneDark * 0.75f), name: "LowerTier");
             for (int i = 0; i < 7; i++)
             {
                 float a = 200 + i * (320f / 7) % 320; if (Mathf.Abs(Mathf.DeltaAngle(a, 0)) < 40) continue;   // keep the south camera arc clear
+                if (i == 1) continue;   // r4 (B4): the bridge at 246 degrees stood between the court and the master gear: three dark piers across the west-rim frame, hiding the hub
                 ArchBridge(stat, a, 34 + (i % 3) * 6f, rng);
             }
 
@@ -589,7 +948,12 @@ namespace LastBell.Arenas.MetronomeCourt
                 RenderSettings.skybox = skyMat;
             }
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear; RenderSettings.fogStartDistance = FogStart; RenderSettings.fogEndDistance = FogEnd;
-            RenderSettings.fogColor = new Color(0.13f, 0.14f, 0.22f);
+            // r4 (B5 critic 1): the haze colour sits near the sky behind the skyline (it was darker than every part of the sky, so
+            // the farthest towers, fully fogged, were the blackest and hardest shapes in the frame: an inverted depth order)
+            RenderSettings.fogColor = new Color(0.24f, 0.24f, 0.36f);
+            // the sky below the horizon equals the fog colour by design (the far void and the abyss bowl fade into it). After
+            // critic 2: it still held the old colour, so the bowl's rim showed as a hard arc in the overview.
+            if (skyMat) skyMat.SetColor("_Low", RenderSettings.fogColor);
         }
 
         void UpdateWorldLighting(bool haste, bool frenzy)
@@ -617,21 +981,26 @@ namespace LastBell.Arenas.MetronomeCourt
             float y = pos.y, seg = h / 3f;
             var toward = -Sim.Flat(pos).normalized; var side = Vector3.Cross(Vector3.up, toward);
             float faceYaw = Mathf.Atan2(toward.x, toward.z) * Mathf.Rad2Deg;
-            var winM = M(Sim.Flat(pos).magnitude > 55f ? WindowGlow * 1.5f : WindowGlow, 0.2f, 0, true);   // far towers: brighter so the fog doesn't erase them
+            var winM = M(Sim.Flat(pos).magnitude > 55f ? WindowGlow * 0.9f : WindowGlow * 0.68f, 0.2f, 0, true);   // far towers: brighter so the fog doesn't erase them   // r4 (B5 critic 1): cores were 207 to 255; now a quiet warm 170 to 190
             // October 27: atmospheric recession, near towers dark stone, far ones dissolving toward dusty indigo/violet
             float far = Mathf.Round(Mathf.InverseLerp(40f, 76f, Sim.Flat(pos).magnitude) * 3f) / 3f;   // four steps: shared materials
             var StoneDark = Color.Lerp(MetronomeCourtArena.StoneDark, new Color(0.30f, 0.30f, 0.42f), far);
-            var IronM = M(Color.Lerp(Iron, new Color(0.21f, 0.21f, 0.31f), far), 0.35f, 0.6f);
+            // r4 (B5): roof slate instead of metallic iron (the metal mirrored the dark sky: 17 m black spires), and every tower
+            // material carries the mid-distance haze lift, like the arch bridges, so a shadowed face is not the void's value
+            var IronM = HazeOf(SlateM(Color.Lerp(new Color(0.19f, 0.20f, 0.29f), new Color(0.25f, 0.25f, 0.36f), far)));
+            // r4 (November 12 critic, B5): the towers stood on y = -14 while the cloud sea lies at -16.5 to -27, so in low
+            // and close views each one showed a flat underside hanging over the cloud. A foot now runs 18 m down into the sea.
+            Mesh(stat, Frustum(w * 0.56f, w * 0.56f, w * 0.5f, w * 0.5f, 18f), HazeOf(StoneM(StoneDark * 0.9f)), "TowerFoot", new Vector3(pos.x, y - 18f, pos.z));
             for (int k = 0; k < 3; k++)
             {
                 float ww = w * (1 - 0.18f * k);
-                Mesh(stat, Frustum(ww * 0.5f, ww * 0.5f, ww * 0.45f, ww * 0.45f, seg), StoneM(StoneDark * (0.9f + 0.1f * k)), "TowerTier", new Vector3(pos.x, y, pos.z));   // October 27: tapered tiers, not prisms
-                P(PrimitiveKind.Cube, stat, new Vector3(pos.x, y + seg, pos.z), new Vector3(ww + 0.4f, 0.3f, ww + 0.4f), StoneM(StoneDark * 0.8f), name: "TowerCornice");
+                Mesh(stat, Frustum(ww * 0.5f, ww * 0.5f, ww * 0.45f, ww * 0.45f, seg), HazeOf(StoneM(StoneDark * (0.9f + 0.1f * k))), "TowerTier", new Vector3(pos.x, y, pos.z));   // October 27: tapered tiers, not prisms
+                P(PrimitiveKind.Cube, stat, new Vector3(pos.x, y + seg, pos.z), new Vector3(ww + 0.4f, 0.3f, ww + 0.4f), HazeOf(StoneM(StoneDark * 0.8f)), name: "TowerCornice");
                 // corner buttresses break the box into a gothic mass
                 for (int c = 0; c < 4; c++)
                 {
                     var o = Quaternion.Euler(0, c * 90 + 45, 0) * Vector3.forward * (ww * 0.68f);
-                    Mesh(stat, Frustum(0.32f, 0.32f, 0.12f, 0.12f, seg * 0.9f), StoneM(StoneDark * 0.85f), "Buttress", new Vector3(pos.x, y, pos.z) + o);
+                    Mesh(stat, Frustum(0.32f, 0.32f, 0.12f, 0.12f, seg * 0.9f), HazeOf(StoneM(StoneDark * 0.85f)), "Buttress", new Vector3(pos.x, y, pos.z) + o);
                 }
                 // pointed-arch slit windows (a narrow slit plus a rotated cap) on the side facing the court
                 if (k < 2 || !bell)
@@ -646,8 +1015,8 @@ namespace LastBell.Arenas.MetronomeCourt
                 if (k == 2 && bell)
                 {
                     var arch = new Vector3(pos.x, y + seg * 0.55f, pos.z) + toward * (ww / 2 + 0.03f);
-                    P(PrimitiveKind.Cube, stat, arch, new Vector3(ww * 0.36f, seg * 0.44f, 0.05f), M(BellGlow, 0.2f, 0, true), new Vector3(0, faceYaw, 0), "BellOpening");
-                    P(PrimitiveKind.Cube, stat, arch + Vector3.up * (seg * 0.22f) + toward * 0.01f, new Vector3(ww * 0.255f, ww * 0.255f, 0.05f), M(BellGlow, 0.2f, 0, true), new Vector3(0, faceYaw, 45), "BellArchPoint");
+                    P(PrimitiveKind.Cube, stat, arch, new Vector3(ww * 0.36f, seg * 0.26f, 0.05f), M(BellGlow * 0.45f, 0.2f, 0, true), new Vector3(0, faceYaw, 0), "BellOpening");   // r4 (B5): shorter and dimmer (it was the brightest thing beside the metronome)
+                    P(PrimitiveKind.Cube, stat, arch + Vector3.up * (seg * 0.13f) + toward * 0.01f, new Vector3(ww * 0.255f, ww * 0.255f, 0.05f), M(BellGlow * 0.45f, 0.2f, 0, true), new Vector3(0, faceYaw, 45), "BellArchPoint");
                     P(PrimitiveKind.Cube, stat, arch + Vector3.down * (seg * 0.05f) + toward * 0.04f, new Vector3(ww * 0.2f, ww * 0.2f, 0.05f), IronM, new Vector3(0, faceYaw, 0), "BellSilhouette");
                 }
                 y += seg;
@@ -668,35 +1037,68 @@ namespace LastBell.Arenas.MetronomeCourt
         {
             var radial = Quaternion.Euler(0, angle, 0) * Vector3.forward;
             var dir = Quaternion.Euler(0, angle + 30f, 0) * Vector3.forward; var tangent = Vector3.Cross(Vector3.up, dir);   // 30 degrees off tangent
-            var centre = radial * r + Vector3.up * -6f; var col = r < 47f ? new Color(0.16f, 0.17f, 0.25f) : new Color(0.12f, 0.13f, 0.19f);
-            float span = 18f, yaw = Mathf.Atan2(tangent.x, tangent.z) * Mathf.Rad2Deg;
-            P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6f, new Vector3(span, 1.2f, 3f), M(col, 0.1f), new Vector3(0, yaw, 0), "BridgeDeck");
+            var centre = radial * r + Vector3.up * -6f; var col = r < 47f ? new Color(0.21f, 0.22f, 0.31f) : new Color(0.17f, 0.18f, 0.26f);   // r4 (B4): one atmospheric step lighter; the near decks crossed the east-rim fight frame as black planks
+            // r4 (B4), pass 2. The bridges are seen from above and down their length from the fight camera, where they read
+            // as dark planks and bars: a bare 18 m deck that overhung its outer piers by 3 m and ended in the air, on three
+            // 1.6 x 3 m slabs 22 m tall whose shadow sides rendered near black (luminance 3 to 8). Now each bridge spans
+            // between two end turrets (square, tapered, with a pyramid cap just above the deck) over one slim middle pier
+            // and two wider arches; the deck carries a paved walk between a kerb on each edge; and every part carries a
+            // faint haze lift (HazeM), so a face in shadow sits in the mid-distance layer instead of going black.
+            float span = 18f, yaw = Mathf.Atan2(tangent.x, tangent.z) * Mathf.Rad2Deg; const float pierGap = 8.1f;
+            var stone = HazeM(col); var stoneB = HazeM(col * 0.93f); var by = Quaternion.Euler(0, yaw, 0);
+            P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6f, new Vector3(span, 1.2f, 3f), stone, new Vector3(0, yaw, 0), "BridgeDeck");
             for (int k = -1; k <= 1; k++)
             {
-                P(PrimitiveKind.Cube, stat, centre + tangent * (k * span / 3) + Vector3.up * -5f, new Vector3(1.6f, 22f, 3f), M(col, 0.1f), new Vector3(0, yaw, 0), "BridgePier");   // pass 3: runs down into the cloud (was 12 m, ended in the void)
+                var foot = centre + tangent * (k * pierGap) + Vector3.up * -16f;   // down in the cloud (pass 3: was 12 m tall and ended in the void)
+                if (k == 0) Mesh(stat, Frustum(0.95f, 0.95f, 0.7f, 0.7f, 22f), stone, "BridgePier", foot).localRotation = by;
+                else
+                {
+                    Mesh(stat, Frustum(1.15f, 1.15f, 1.0f, 1.0f, 24.4f), stone, "BridgeTurret", foot).localRotation = by;
+                    Mesh(stat, Frustum(1.12f, 1.12f, 1.12f, 1.12f, 0.25f), HazeM(col * 1.12f), "BridgeTurretCornice", foot + Vector3.up * 24.4f).localRotation = by;
+                    Mesh(stat, Frustum(1.0f, 1.0f, 0.04f, 0.04f, 1.7f), HazeM(col * 0.8f), "BridgeTurretCap", foot + Vector3.up * 24.65f).localRotation = by;
+                }
                 if (k < 1)
                 {
-                    var mid = centre + tangent * ((k + 0.5f) * span / 3);
-                    float rad = (span / 3 - 1.6f) / 2f, springY = 5.4f - rad;   // crown just under the deck
+                    var mid = centre + tangent * ((k + 0.5f) * pierGap);
+                    float rad = (pierGap - 1.9f) / 2f, springY = 5.4f - rad;   // crown just under the deck
                     var frame = Quaternion.LookRotation(dir, Vector3.up);       // local x = tangent, y = up, z = radial
-                    for (int v = 0; v < 7; v++)
+                    for (int v = 0; v < 9; v++)
                     {
-                        float ang = Mathf.Lerp(-90f, 90f, (v + 0.5f) / 7f);
+                        float ang = Mathf.Lerp(-90f, 90f, (v + 0.5f) / 9f);
                         var off = tangent * (Mathf.Sin(ang * Mathf.Deg2Rad) * rad) + Vector3.up * (springY + Mathf.Cos(ang * Mathf.Deg2Rad) * rad);
-                        var vs = P(PrimitiveKind.Cube, stat, mid + off, new Vector3(1.0f, 0.55f, 3f), M(col * 0.95f, 0.1f), null, "BridgeVoussoir");
+                        var vs = P(PrimitiveKind.Cube, stat, mid + off, new Vector3(1.14f, 0.55f, 2.4f), stoneB, null, "BridgeVoussoir");
                         vs.localRotation = frame * Quaternion.Euler(0, 0, -ang);
                     }
                     foreach (var sx in new[] { -1, 1 })   // spandrels fill the haunches up to the deck
                     {
-                        var sp = P(PrimitiveKind.Cube, stat, mid + tangent * (sx * rad * 0.95f) + Vector3.up * (springY + rad * 0.85f), new Vector3(1.4f, rad * 0.7f, 3f), M(col, 0.1f), null, "BridgeSpandrel");
+                        var sp = P(PrimitiveKind.Cube, stat, mid + tangent * (sx * rad * 0.82f) + Vector3.up * (springY + rad * 0.86f), new Vector3(rad * 0.56f, rad * 0.62f, 2.2f), stone, null, "BridgeSpandrel");
                         sp.localRotation = frame;
                     }
                 }
             }
-            P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6.9f, new Vector3(span, 0.6f, 0.3f), M(col * 1.1f, 0.1f), new Vector3(0, yaw, 0), "BridgeParapet");
+            P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6.63f, new Vector3(span - 2.4f, 0.08f, 2.2f), HazeM(col * 1.04f), new Vector3(0, yaw, 0), "BridgeWalk");
+            foreach (var s in new[] { -1f, 1f })
+                P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6.9f + dir * (s * 1.35f), new Vector3(span - 2.2f, 0.6f, 0.3f), HazeM(col * 1.1f), new Vector3(0, yaw, 0), "BridgeParapet");
             for (int k = -1; k <= 1; k++)
-                P(PrimitiveKind.Cube, stat, centre + tangent * (k * span / 3 + 1.5f) + Vector3.up * 6.9f - dir * 0.16f, new Vector3(0.45f, 0.4f, 0.05f), M(WindowGlow * 1.3f, 0.2f, 0, true), new Vector3(0, yaw, 0), "BridgeWindow");
+                P(PrimitiveKind.Cube, stat, centre + tangent * (k * 5f + 1.5f) + Vector3.up * 6.9f - dir * 1.51f, new Vector3(0.45f, 0.4f, 0.05f), M(WindowGlow * 1.3f, 0.2f, 0, true), new Vector3(0, yaw, 0), "BridgeWindow");
         }
+
+        // r4 (B4): mid-distance stone and iron with a faint haze-coloured emission. These structures stand 30 to 50 m from the
+        // fight camera, nearer than the scene fog starts, and a face the key light misses fell to the void's value. The lift
+        // is the same for every colour, so lit faces barely change and shadowed ones settle near luminance 35 to 45.
+        static readonly Dictionary<(Material, int), Material> hazeMats = new Dictionary<(Material, int), Material>();
+        static readonly Color HazeLift = new Color(0.035f, 0.038f, 0.07f);   // linear (an HDR colour property is not gamma-converted): about 45,48,66 on screen by itself
+        // strength scales the lift: 1 for structures 40 m and more from the court, less for nearer ones (B5: the flank
+        // belfries, 35 to 39 m out, went flat lilac at full strength)
+        static Material HazeOf(Material src, float strength = 1f)
+        {
+            var key = (src, Mathf.RoundToInt(strength * 20));
+            if (hazeMats.TryGetValue(key, out var m) && m) return m;
+            m = new Material(src) { name = src.name + "_Haze" + key.Item2 };
+            m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", HazeLift * strength);
+            return hazeMats[key] = m;
+        }
+        static Material HazeM(Color c) => HazeOf(M(c, 0.1f));
 
         static string Roman(int n) => new[] { "", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }[n];
 
@@ -743,19 +1145,84 @@ namespace LastBell.Arenas.MetronomeCourt
         // could hide a player at the wall, so camera-side perimeter pieces are low bollards with a lantern on top.
         static bool CameraSide(Vector3 at) => at.z > -4f;
 
-        void Lantern(Transform root, Vector3 at, float scale, bool pool = false, bool turret = false)
+        // r4 (B2 critic 1: "the pane is a flat slab: no hot centre, no falloff to the frame"): the lantern glass carries a
+        // small painted glow map on its emission. A soft flame-height hot spot in the lower middle, a little darker toward
+        // the frame, a fifth darker and cooler toward the top, and a slightly warmer foot. The map peaks at 1, so the
+        // emission level set in Update is still the brightest value a pane can show.
+        static Material glassMat; static Texture2D glassGlow; static Mesh paneMesh;
+        static Material GlassM()
+        {
+            if (glassMat) return glassMat;
+            if (!glassGlow)
+            {
+                const int W = 32, H = 64; var px = new Color32[W * H];
+                for (int y = 0; y < H; y++)
+                    for (int x = 0; x < W; x++)
+                    {
+                        float u = (x + 0.5f) / W, v = (y + 0.5f) / H;
+                        // r4 (T5: "one flat cream value, a lightbox with no flame"): the B2 map meant to dim the head of the pane
+                        // but handed its edges to Mathf.SmoothStep (an interpolation), so the pane came out within 8% top to
+                        // bottom. Now: a flame low in the pane at 0.92, the glass round it at 0.84, the foot a little
+                        // under that, and the top third falling to 0.65.
+                        // Pass 2 (critic 1: "a frosted lightbox with a soft hot spot", "the same cream from top to bottom"): a
+                        // small warm core low in the pane (a quarter of its width, a third of its height), cream glass round
+                        // it, a cooler and dimmer head, and a thin dark glazing bar at 40% of the height, so the pane reads
+                        // as two lights over a flame. The peak stays at 0.92, the B2 map's peak.
+                        float core = Mathf.Exp(-((u - 0.5f) * (u - 0.5f)) / (0.13f * 0.13f) - ((v - 0.24f) * (v - 0.24f)) / (0.15f * 0.15f));
+                        float halo = Mathf.Exp(-((u - 0.5f) * (u - 0.5f)) / (0.36f * 0.36f) - ((v - 0.28f) * (v - 0.28f)) / (0.3f * 0.3f));
+                        float head = Edge(0.5f, 0.95f, v);
+                        float val = 0.74f + 0.1f * halo + 0.08f * core - 0.2f * head - 0.03f * Edge(0.1f, 0f, v);
+                        float bar = 1f - 0.62f * Edge(0.028f, 0.012f, Mathf.Abs(v - 0.4f));
+                        float r = val * bar, g = val * bar * (1f - 0.07f * core + 0.01f * head), b = val * bar * (1f - 0.2f * core - 0.05f * halo + 0.06f * head);
+                        px[y * W + x] = new Color(r, g, b, 1f);
+                    }
+                glassGlow = new Texture2D(W, H, TextureFormat.RGBA32, false, false) { name = "MetronomeCourt_GlassGlow", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                glassGlow.SetPixels32(px); glassGlow.Apply(false, Application.isPlaying);   // readable in the editor, for the menu's baked copy
+            }
+            glassMat = new Material(M(new Color(0.3f, 0.27f, 0.19f), 0.6f, 0, true)) { name = "MetronomeCourt_LanternGlass" };
+            glassMat.EnableKeyword("_EMISSION"); glassMat.SetTexture("_EmissionMap", glassGlow);
+            return glassMat;
+        }
+        // a unit box whose two broad faces (+z and -z) carry 0..1 UVs for the glow map; its thin edges sample the map's middle
+        static Mesh PaneMesh()
+        {
+            if (paneMesh) return paneMesh;
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+            foreach (var d in new[] { Vector3.forward, Vector3.back, Vector3.right, Vector3.left, Vector3.up, Vector3.down })
+            {
+                var a = Vector3.Cross(d, Mathf.Abs(d.y) > 0.5f ? Vector3.forward : Vector3.up); var w = Vector3.Cross(d, a); int b = v.Count;
+                foreach (var c in new[] { d - a - w, d + a - w, d + a + w, d - a + w })
+                {
+                    var p = c * 0.5f; v.Add(p); n.Add(d);
+                    uv.Add(Mathf.Abs(d.z) > 0.5f ? new Vector2(p.x + 0.5f, p.y + 0.5f) : new Vector2(0.5f, Mathf.Abs(d.y) > 0.5f ? 0.5f : p.y + 0.5f));
+                }
+                bool flip = Vector3.Dot(Vector3.Cross(v[b + 2] - v[b], v[b + 1] - v[b]), d) < 0;   // same winding as Prim's box (clockwise front faces)
+                if (flip) { t.Add(b); t.Add(b + 1); t.Add(b + 2); t.Add(b); t.Add(b + 2); t.Add(b + 3); }
+                else { t.Add(b); t.Add(b + 2); t.Add(b + 1); t.Add(b); t.Add(b + 3); t.Add(b + 2); }
+            }
+            paneMesh = new Mesh { name = "LanternPaneBox" }; paneMesh.SetVertices(v); paneMesh.SetNormals(n); paneMesh.SetUVs(0, uv); paneMesh.SetTriangles(t, 0); paneMesh.RecalculateBounds();
+            return paneMesh;
+        }
+
+        void Lantern(Transform root, Vector3 at, float scale, bool pool = false, bool turret = false, float yaw = 0)
         {
             var l = new GameObject("Lantern").transform; l.SetParent(root, false); l.localPosition = at;
+            // r4 (B2): turned with its post or bollard. The glass box used to stay square to the world inside a turret turned
+            // by the post's rim angle, so its corners stuck out past the columns and the drum.
+            l.localRotation = Quaternion.Euler(0, yaw, 0);
             // r3 (October 28 critic: "an orange ping-pong ball stuck in a frame"): four lit glass panes inside the corner bars,
             // so the cage reads as a lit box with dark mullions, round a small egg-shaped flame (the old 0.38 m ball cut
             // through the bars). Both take the lantern glow; the glass is blended toward cream in Update.
-            var glassM = M(new Color(0.3f, 0.27f, 0.19f), 0.6f, 0, true);
+            var glassM = GlassM();
             for (int k = 0; k < 4; k++)
             {
                 // final fix (critic: glass filled half the turret, slivers at the seams): in a turret the panes run from the
                 // plinth to the drum and overlap at the corners
-                float pr = turret ? 0.2f : 0.135f, pw = turret ? 0.42f : 0.27f, ph = turret ? 0.62f : 0.4f, py = turret ? 0.09f : 0f;
-                var pane = P(PrimitiveKind.Cube, l, Quaternion.Euler(0, k * 90, 0) * Vector3.forward * pr * scale + Vector3.up * py * scale, new Vector3(pw, ph, 0.012f) * scale, glassM, new Vector3(0, k * 90, 0), "LanternPane");
+                // r4 (B2 critic 1): the panes now run 4 cm up into the drum (turret) or the drip band (bollard), so their
+                // sunlit top faces are hidden: from above those edges were a white line brighter than the glass itself
+                float pr = turret ? 0.2f : 0.135f, pw = turret ? 0.42f : 0.27f, ph = turret ? 0.70f : 0.44f, py = turret ? 0.13f : 0f;
+                var pane = Mesh(l, PaneMesh(), glassM, "LanternPane", Quaternion.Euler(0, k * 90, 0) * Vector3.forward * pr * scale + Vector3.up * py * scale);
+                pane.localScale = new Vector3(pw, ph, 0.012f) * scale; pane.localRotation = Quaternion.Euler(0, k * 90, 0);
                 lanternGlass.Add((pane.GetComponent<Renderer>(), at.x));
             }
             var core = P(PrimitiveKind.Sphere, l, Vector3.down * 0.02f * scale, new Vector3(0.16f, 0.22f, 0.16f) * scale, M(new Color(1f, 0.94f, 0.81f), 0.2f, 0, true), name: "LanternCore");
@@ -768,7 +1235,17 @@ namespace LastBell.Arenas.MetronomeCourt
                 P(PrimitiveKind.Sphere, l, Vector3.up * 0.48f * scale, Vector3.one * 0.07f * scale, BrassM, name: "LanternFinial");
             }
             var glowRing = P(PrimitiveKind.Cube, l, (turret ? Vector3.zero : Vector3.up * 0.25f) * scale, (turret ? new Vector3(0.2f, 0.02f, 0.2f) : new Vector3(0.34f, 0.02f, 0.34f)) * scale, M(new Color(1f, 0.7f, 0.3f), 0.2f, 0, true), name: "LanternGlowRing");
-            lanterns.Add((glowRing.GetComponent<Renderer>(), at.x));
+            lanterns.Add((glowRing.GetComponent<Renderer>(), at.x)); lanternRings.Add((glowRing.GetComponent<Renderer>(), at.x));
+            if (!turret)
+            {   // r4 (November 12 critic, T7: from 13 m up each lamp was "a dark square cap with a thin tempo-tinted rim", teal
+                // in Normal, close to the player's teal effects): a cream lip 4 cm wide round the foot of the cap, in the
+                // glass's cream at a lower level (it faces the sky, so it is lit as well as glowing)
+                // Pass 2 (critic 1: "a stone slab, not light", "a hat on a tray", uneven round the rim): the lip stops 1 cm
+                // outside the cap's eave (it stood 4 cm out, past the bars), it is matt and nearly all emission, so the sun no
+                // longer sets its value, and the glow ring 1 cm further out is the dimmer outer step of the spill
+                var lip = P(PrimitiveKind.Cube, l, Vector3.up * 0.262f * scale, new Vector3(0.32f, 0.016f, 0.32f) * scale, M(new Color(0.3f, 0.27f, 0.19f), 0.1f, 0, true), name: "LanternLip");
+                lanternLips.Add((lip.GetComponent<Renderer>(), at.x));
+            }
             P(PrimitiveKind.Cube, l, Vector3.down * 0.24f * scale, new Vector3(0.4f, 0.05f, 0.4f) * scale, BrassM, name: "LanternBase");
             lanterns.Add((core.GetComponent<Renderer>(), at.x));
             if (pool) LanternPool(root, at);
@@ -822,6 +1299,9 @@ namespace LastBell.Arenas.MetronomeCourt
         readonly List<(Transform t, Quaternion rest, float amp, float phase, float speed)> swingers = new List<(Transform, Quaternion, float, float, float)>();
         readonly List<(Transform t, float speed)> spinners = new List<(Transform, float)>();
         readonly List<(Renderer r, float x)> lanternGlass = new List<(Renderer, float)>();
+        // r4 (T7): the glow rings again (they stay in `lanterns` too, for the count), re-tinted most of the way to cream after
+        // the lantern loop, and the cream lips under the bollard caps
+        readonly List<(Renderer r, float x)> lanternRings = new List<(Renderer, float)>(), lanternLips = new List<(Renderer, float)>();
         float swayTime;
         readonly List<Vector3> rimBollards = new List<Vector3>();
         // round 3 (N2): banner cloth, lighter teal with a faint teal emission so a banner on the shade face still reads
@@ -832,27 +1312,88 @@ namespace LastBell.Arenas.MetronomeCourt
             var c = new Color(0.14f, 0.50f, 0.48f);
             bannerCloth = new Material(SurfM(c, Surface.Cloth, 0.3f)) { name = "MetronomeCourt_BannerCloth" };
             bannerCloth.EnableKeyword("_EMISSION"); bannerCloth.SetColor("_EmissionColor", new Color(0.02f, 0.07f, 0.07f));
+            // r4 (T5: "a flat board with no folds"): on the shade face nearly all of the cloth's value is this emission, which
+            // was one flat colour, so the painted folds never showed. The emission now carries the cloth texture too.
+            if (SurfaceKit) { bannerCloth.SetTexture("_EmissionMap", SurfaceTexture(Surface.Cloth)); bannerCloth.SetColor("_EmissionColor", new Color(0.02f, 0.07f, 0.07f) / surfaceMean[Surface.Cloth]); }
             return bannerCloth;
+        }
+        static Material bannerTailCloth;
+        static Material BannerTailCloth()
+        {
+            if (bannerTailCloth) return bannerTailCloth;
+            bannerTailCloth = new Material(BannerCloth()) { name = "MetronomeCourt_BannerTailCloth" };
+            bannerTailCloth.SetColor("_EmissionColor", bannerTailCloth.GetColor("_EmissionColor") * 1.22f);
+            return bannerTailCloth;
+        }
+        // r4 (T5: "the border reads mid-grey, not ivory"): the banners hang on the shade face of their posts, where the
+        // ivory border came out darker than the cloth (the cloth has its own faint emission). The border gets the same help.
+        static Material bannerBorder;
+        static Material BannerBorder()
+        {
+            if (bannerBorder) return bannerBorder;
+            bannerBorder = new Material(M(new Color(0.85f, 0.80f, 0.68f), 0.3f)) { name = "MetronomeCourt_BannerBorder" };
+            bannerBorder.EnableKeyword("_EMISSION"); bannerBorder.SetColor("_EmissionColor", new Color(0.118f, 0.099f, 0.065f));   // pass 2 (critic 1: "pale grey-beige in shade"): the same level, yellower
+            return bannerBorder;
         }
         // round 3 (N6): an aged-brass chain swag between neighbouring near-rim bollards, hung from rings on their collars
         void BuildSwags(Transform stat)
         {
-            var chain = M(Brass * 0.6f, 0.4f, 0.8f);
+            // r4 (November 12 critic, T3: "a straight brown wire" at range, "a segmented leather belt" close up): real links.
+            // Each link is an eight-sided ring of bars, 24 cm long and 10.5 cm wide in 3.4 cm stock, and every other link is
+            // turned a quarter turn about the chain, so the swag shows a broad link and a narrow one in turn from any side.
+            // It hangs 0.45 m (was 0.3) from an eye on each bollard collar, in a painted iron-brown (not a dark metal, which
+            // went black in shade). One mesh per swag (each was 18 flat plates). Pass 1 had square four-bar links ("a ladder",
+            // "staggered bricks", critic 1) butting straight into the collar.
+            var chain = PlainM(Brass * 0.3f, 0.3f);
             var sorted = new List<Vector3>(rimBollards); sorted.Sort((p, q) => Mathf.Atan2(p.x, p.z).CompareTo(Mathf.Atan2(q.x, q.z)));
             for (int i = 0; i + 1 < sorted.Count; i++)
             {
                 Vector3 a = sorted[i], b = sorted[i + 1];
                 if (Vector3.Angle(a, b) > 30f) continue;   // the bridge gap
                 var dirAB = (b - a).normalized; Vector3 from = a + Vector3.up * 0.53f + dirAB * 0.22f, to = b + Vector3.up * 0.53f - dirAB * 0.22f;
-                foreach (var ring in new[] { from, to }) P(PrimitiveKind.Cube, stat, ring, new Vector3(0.08f, 0.08f, 0.02f), chain, Quaternion.LookRotation(dirAB).eulerAngles, "SwagRing");
-                const int links = 18; const float sag = 0.3f;
+                var cv = new List<Vector3>(); var ct = new List<int>();
+                void Face(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 outward)
+                {
+                    if (Vector3.Dot(Vector3.Cross(p1 - p0, p2 - p0), outward) < 0) { var sw = p1; p1 = p3; p3 = sw; }
+                    int k = cv.Count; cv.Add(p0); cv.Add(p1); cv.Add(p2); cv.Add(p3); ct.Add(k); ct.Add(k + 1); ct.Add(k + 2); ct.Add(k); ct.Add(k + 2); ct.Add(k + 3);
+                }
+                // an open square bar from p0 to p1, `w` thick, `n` = the link's normal. Each end runs on by 0.207 w, which
+                // mitres the outer edge of a 45 degree corner exactly
+                void Tube(Vector3 p0, Vector3 p1, Vector3 n, float w)
+                {
+                    var d = (p1 - p0).normalized; var side = Vector3.Cross(n, d).normalized; p0 -= d * w * 0.207f; p1 += d * w * 0.207f;
+                    var ring = new[] { n + side, n - side, -n - side, -n + side };
+                    for (int k = 0; k < ring.Length; k++)
+                    {
+                        Vector3 o0 = ring[k] * (w * 0.5f), o1 = ring[(k + 1) % ring.Length] * (w * 0.5f);
+                        Face(p0 + o0, p1 + o0, p1 + o1, p0 + o1, o0 + o1);
+                    }
+                }
+                // one link: an eight-sided ring in its own x-z plane (z along the chain), its four corners cut
+                void Link(Vector3 c, Quaternion q, float len, float wid, float st)
+                {
+                    float hl = len / 2 - st / 2, hw = wid / 2 - st / 2, ch = Mathf.Min(hw, hl) * 0.62f; var n = q * Vector3.up;
+                    Vector3 At(float x, float z) => c + q * new Vector3(x, 0, z);
+                    var o = new[] { At(hw, -(hl - ch)), At(hw, hl - ch), At(hw - ch, hl), At(-(hw - ch), hl), At(-hw, hl - ch), At(-hw, -(hl - ch)), At(-(hw - ch), -hl), At(hw - ch, -hl) };
+                    for (int k = 0; k < 8; k++) Tube(o[k], o[(k + 1) % 8], n, st);
+                }
+                // the eye on each collar: an upright ring, half its width into the collar, that the end link passes through
+                foreach (var (eye, sgn) in new[] { (from, 1f), (to, -1f) }) Link(eye - dirAB * (sgn * 0.005f), Quaternion.LookRotation(dirAB) * Quaternion.Euler(0, 0, 90), 0.125f, 0.125f, 0.03f);
+                const float sag = 0.45f, linkLen = 0.24f, linkW = 0.105f, stock = 0.034f, pitch = linkLen - 2 * stock + 0.006f;
                 Vector3 Pt(float s) => Vector3.Lerp(from, to, s) + Vector3.down * (sag * 4 * s * (1 - s));
+                // equal steps along the curve, not along the chord, so the links keep their length where the swag is steep
+                const int steps = 240; var arc = new float[steps + 1];
+                for (int k = 1; k <= steps; k++) arc[k] = arc[k - 1] + (Pt(k / (float)steps) - Pt((k - 1) / (float)steps)).magnitude;
+                int links = Mathf.Max(1, Mathf.RoundToInt(arc[steps] / pitch)); int ai = 0;
                 for (int k = 0; k < links; k++)
                 {
-                    Vector3 p0 = Pt(k / (float)links), p1 = Pt((k + 1) / (float)links), seg = p1 - p0;
-                    var q = Quaternion.LookRotation(seg) * Quaternion.Euler(0, 0, k % 2 == 0 ? 0 : 90);
-                    P(PrimitiveKind.Cube, stat, (p0 + p1) / 2, new Vector3(0.05f, 0.018f, seg.magnitude * 1.05f), chain, q.eulerAngles, "SwagLink");
+                    float target = (k + 0.5f) / links * arc[steps]; while (ai < steps - 1 && arc[ai + 1] < target) ai++;
+                    float s = (ai + Mathf.InverseLerp(arc[ai], arc[ai + 1], target)) / steps;
+                    Vector3 c = Pt(s), tan = (Pt(Mathf.Min(1, s + 0.01f)) - Pt(Mathf.Max(0, s - 0.01f))).normalized;
+                    Link(c, Quaternion.LookRotation(tan) * Quaternion.Euler(0, 0, k % 2 == 0 ? 0 : 90), linkLen, linkW, stock);
                 }
+                var swag = new Mesh { name = "Swag" }; swag.SetVertices(cv); swag.SetTriangles(ct, 0); swag.RecalculateNormals(); swag.RecalculateBounds();
+                Mesh(stat, swag, chain, "Swag");
             }
         }
         readonly List<(Transform t, float radius, float angle, float y, float speed)> cloudBanks = new List<(Transform, float, float, float, float)>();
@@ -865,25 +1406,34 @@ namespace LastBell.Arenas.MetronomeCourt
         void BuildAmbience(Transform root)
         {
             var arng = new System.Random(97);
-            var gearM = M(new Color(0.17f, 0.18f, 0.26f), 0.35f, 0.6f);   // October 27: mid-distance iron, not a black wall
-            var gearTrim = M(Brass * 0.35f, 0.4f, 0.8f);
+            // r4 (November 12 critic, B4): from the fight camera at the east and west rims the gears crossed the frame as
+            // near-black planks with floating teeth (iron at the void's value, metallic, so it mirrored the dark sky; spokes
+            // 1.7 m wide; tops 10 m above the rim). Now: plated iron lifted one atmospheric step toward the towers' dusty
+            // indigo and matte, so the key light models it; each gear sits 6 to 8 m farther out and lower, its top at or
+            // under the rim, the lower half in the cloud sea; spokes a third slimmer; an aged-brass edge band on the rim and
+            // a brass collar and boss on the hub, so what shows above the cloud reads as a gear.
+            var gearM = HazeOf(SurfM(new Color(0.29f, 0.30f, 0.41f), Surface.Iron, 0.2f));   // pass 2: with the haze lift, so the wheel is not black on black in the wide views
+            var gearTrim = SurfM(Brass * 0.62f, Surface.Brass, 0.3f); var gearEdge = SurfM(Brass * 0.58f, Surface.Brass, 0.3f);   // pass 2: painted, not metallic (metal mirrored the dark sky and vanished)
             // October 27 (critic: a wall of solid gears crowded the landmark): openwork gears (rim, spokes, hub; the sky shows
             // through) moved off the metronome's sky opening. One master gear on the west flank, half sunk in the cloud sea,
             // a smaller partner above it, and a third low in the east cloud. Each faces the court.
-            foreach (var (pos, radius, teeth, dir) in new[] { (new Vector3(-33f, -4f, -24f), 13f, 30, 0.5f), (new Vector3(-44f, -7f, -8f), 7f, 18, -1.2f), (new Vector3(36f, -9f, -14f), 8f, 20, 0.8f) })
+            foreach (var (pos, radius, teeth, dir) in new[] { (new Vector3(-39f, -16.5f, -28f), 13f, 30, 0.5f), (new Vector3(-50f, -9.5f, -10f), 7f, 18, -1.2f), (new Vector3(47f, -11.5f, 3f), 8f, 20, 0.8f) })
             {
                 var g = new GameObject("Sky gear").transform; g.SetParent(root, false); g.localPosition = pos;
                 g.localRotation = Quaternion.LookRotation(-Sim.Flat(pos).normalized, Vector3.up);
                 var spin = new GameObject("Spin").transform; spin.SetParent(g, false);
                 Mesh(spin, Sector(radius * 0.8f, radius, 0, 360, 0.7f, 72), gearM, "GearRim").localRotation = Quaternion.Euler(90, 0, 0);
-                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.3f, 0.5f, radius * 0.3f), gearTrim, new Vector3(90, 0, 0), "GearHub");
+                Mesh(spin, Sector(radius * 0.9f, radius * 0.97f, 0, 360, 0.06f, 72), gearEdge, "GearRimEdge", new Vector3(0, 0, 0.05f)).localRotation = Quaternion.Euler(90, 0, 0);
+                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.3f, 0.5f, radius * 0.3f), gearM, new Vector3(90, 0, 0), "GearHub");
+                Mesh(spin, Sector(radius * 0.11f, radius * 0.15f, 0, 360, 0.12f, 36), gearTrim, "GearHubCollar", new Vector3(0, 0, 0.2f)).localRotation = Quaternion.Euler(90, 0, 0);
+                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, 0.12f), new Vector3(radius * 0.1f, 0.14f, radius * 0.1f), gearTrim, new Vector3(90, 0, 0), "GearHubBoss");
                 for (int k = 0; k < teeth; k++)
                 {
                     float a = k * 360f / teeth;
                     P(PrimitiveKind.Cube, spin, Quaternion.Euler(0, 0, a) * Vector3.up * (radius + 0.6f), new Vector3(radius * 0.14f, 1.4f, 0.6f), gearM, new Vector3(0, 0, a), "GearTooth");
                 }
-                for (int k = 0; k < 3; k++)   // six broad spokes (three bars through the hub) with wide gaps for the sky
-                    P(PrimitiveKind.Cube, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.13f, radius * 1.7f, 0.5f), gearM, new Vector3(0, 0, k * 60f), "GearSpoke");
+                for (int k = 0; k < 3; k++)   // six spokes (three bars through the hub) with wide gaps for the sky
+                    P(PrimitiveKind.Cube, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.085f, radius * 1.7f, 0.5f), gearM, new Vector3(0, 0, k * 60f), "GearSpoke");
                 gears.Add((spin, dir));
             }
 
@@ -920,7 +1470,7 @@ namespace LastBell.Arenas.MetronomeCourt
             }
 
             // far city layer: flat fog-coloured silhouettes at 90-140 m (the fog swallows them into a second skyline)
-            var farM = M(new Color(0.11f, 0.12f, 0.18f), 0.1f); var farWin = M(new Color(0.3f, 0.2f, 0.1f), 0.2f, 0, true);
+            var farM = M(new Color(0.11f, 0.12f, 0.18f), 0.1f); var farWin = M(new Color(0.24f, 0.17f, 0.08f), 0.2f, 0, true);
             var far = new GameObject("Far city").transform; far.SetParent(root, false);
             for (int i = 0; i < 26; i++)
             {
@@ -928,7 +1478,8 @@ namespace LastBell.Arenas.MetronomeCourt
                 float r = 95f + (float)arng.NextDouble() * 45f, h = 18f + (float)arng.NextDouble() * 34f, w = 5f + (float)arng.NextDouble() * 6f;
                 var pos = Quaternion.Euler(0, a + 180f, 0) * Vector3.forward * r; pos.y = -20f;
                 var yaw = new Vector3(0, a, 0);
-                P(PrimitiveKind.Cube, far, pos + Vector3.up * h / 2, new Vector3(w, h, 1.5f), farM, yaw, "FarTower");
+                // r4 (B5 critic 1): each silhouette runs 30 m further down (its foot sat at -20, above the far cloud: a cut bottom edge)
+                P(PrimitiveKind.Cube, far, pos + Vector3.up * (h / 2 - 15f), new Vector3(w, h + 30f, 1.5f), farM, yaw, "FarTower");
                 P(PrimitiveKind.Cone, far, pos + Vector3.up * (h + 5f), new Vector3(w * 0.7f, 10f, 1.5f), farM, yaw, "FarSpire");
                 if (i % 3 == 0) P(PrimitiveKind.Cube, far, pos + Vector3.up * h * 0.7f - Sim.Flat(pos).normalized * 0.8f, new Vector3(0.5f, 1.2f, 0.1f), farWin, yaw, "FarWindow");
             }
@@ -1047,12 +1598,39 @@ namespace LastBell.Arenas.MetronomeCourt
             }
             var inward = -Sim.Flat(at).normalized;
             var go = new GameObject("LanternPool"); go.transform.SetParent(root, false);
-            go.transform.localPosition = new Vector3(at.x, 0.02f, at.z) + inward * 1.6f;
-            var mesh = new Mesh { name = "PoolQuad" };
-            const float h = 0.9f;   // half-extent: a 1.8 m pool
-            mesh.vertices = new[] { new Vector3(-h, 0, -h), new Vector3(-h, 0, h), new Vector3(h, 0, -h), new Vector3(h, 0, h) };
-            mesh.uv = new[] { new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 0), new Vector2(1, 1) };
-            mesh.triangles = new[] { 0, 1, 2, 1, 3, 2 }; mesh.RecalculateBounds();
+            Mesh mesh;
+            if (Mathf.Abs(Sim.Flat(at).magnitude - PostRadius) < 0.05f)
+            {
+                // r4 (B3 critic 1: "a small round smudge, not light cast by a lantern", centred in the band with a dark gap
+                // to the parapet): under a rim post the pool is a soft ellipse lying along the dial band, 2.4 m long. Its
+                // peak sits on the outer part of the band (12.95 m) and it runs out to the parapet foot below the lantern
+                // and in to nothing at the 12.5 m movement bound, so no pool light lies inside the play space.
+                const float rIn = 12.5f, rPeak = 12.95f, rOut = ParapetRadius - 0.21f, halfDeg = 5.3f; const int segs = 8;
+                float mid = Mathf.Atan2(at.x, at.z) * Mathf.Rad2Deg;
+                var pv = new Vector3[(segs + 1) * 3]; var puv = new Vector2[(segs + 1) * 3]; var pt = new int[segs * 12];
+                for (int s = 0; s <= segs; s++)
+                {
+                    float u = s / (float)segs, a = (mid + Mathf.Lerp(-halfDeg, halfDeg, u)) * Mathf.Deg2Rad; var d = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+                    pv[s * 3] = d * rIn; puv[s * 3] = new Vector2(u, 0f); pv[s * 3 + 1] = d * rPeak; puv[s * 3 + 1] = new Vector2(u, 0.5f); pv[s * 3 + 2] = d * rOut; puv[s * 3 + 2] = new Vector2(u, 1f);
+                    if (s == segs) continue;
+                    for (int row = 0; row < 2; row++)
+                    {
+                        int b = s * 3 + row, k = (s * 2 + row) * 6;
+                        pt[k] = b; pt[k + 1] = b + 1; pt[k + 2] = b + 3; pt[k + 3] = b + 1; pt[k + 4] = b + 4; pt[k + 5] = b + 3;
+                    }
+                }
+                mesh = new Mesh { name = "PoolBandArc" }; mesh.vertices = pv; mesh.uv = puv; mesh.triangles = pt; mesh.RecalculateBounds();
+                go.transform.localPosition = new Vector3(0, 0.02f, 0);
+            }
+            else
+            {
+                go.transform.localPosition = new Vector3(at.x, 0.02f, at.z) + inward * 1.6f;
+                mesh = new Mesh { name = "PoolQuad" };
+                const float h = 0.9f;   // half-extent: a 1.8 m pool
+                mesh.vertices = new[] { new Vector3(-h, 0, -h), new Vector3(-h, 0, h), new Vector3(h, 0, -h), new Vector3(h, 0, h) };
+                mesh.uv = new[] { new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 0), new Vector2(1, 1) };
+                mesh.triangles = new[] { 0, 1, 2, 1, 3, 2 }; mesh.RecalculateBounds();
+            }
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = poolMat;
             r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
@@ -1081,7 +1659,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 Mesh(stat, Frustum(0.16f, 0.16f, 0.21f, 0.21f, 0.06f), StoneM(Ivory), "BollardCapital", at + Vector3.up * 0.63f).localRotation = by;
                 Mesh(stat, Frustum(0.22f, 0.22f, 0.22f, 0.22f, 0.035f), StoneM(Ivory * 0.92f), "BollardAbacus", at + Vector3.up * 0.69f).localRotation = by;
                 Mesh(stat, Frustum(0.2f, 0.2f, 0.15f, 0.15f, 0.05f), agedB, "BollardCap", at + Vector3.up * 0.725f).localRotation = by;
-                Lantern(root, at + Vector3.up * 0.96f, 0.75f);   // the lantern base sits on the bollard cap
+                Lantern(root, at + Vector3.up * 0.96f, 0.75f, yaw: yaw);   // the lantern base sits on the bollard cap
                 if (Mathf.Abs(Sim.Flat(at).magnitude - PostRadius) < 0.05f) rimBollards.Add(at);
                 return;
             }
@@ -1138,7 +1716,7 @@ namespace LastBell.Arenas.MetronomeCourt
             // r3 (F4): a real banner. It hangs from a brass rod on two brackets, 0.3 m clear of the shaft (a visible gap and
             // shadow), lighter teal with an ivory border, a darker hem and a brass bell glyph, a swallowtail with a proper
             // notch, and it sways: the body from the rod, the tails a little more from the body's foot
-            var cloth = BannerCloth(); var glyph = M(new Color(0.72f, 0.6f, 0.34f), 0.3f); var border = M(new Color(0.85f, 0.80f, 0.68f), 0.3f);
+            var cloth = BannerCloth(); var glyph = M(new Color(0.72f, 0.6f, 0.34f), 0.3f); var border = BannerBorder();
             float bannerLen = new[] { 1.6f, 1.25f, 1.9f }[Mathf.Abs(Mathf.RoundToInt(yaw / 10f)) % 3];   // pass 4: three lengths round the court
             foreach (float s in new[] { -0.3f, 0.3f })
                 P(PrimitiveKind.Cube, stat, at + inward * 0.53f + side * s + Vector3.up * 2.87f, new Vector3(0.04f, 0.04f, 0.32f), agedBrass, new Vector3(0, faceYaw, 0), "BannerBracket");
@@ -1160,11 +1738,14 @@ namespace LastBell.Arenas.MetronomeCourt
             foreach (float s in new[] { -1f, 1f })
             {
                 var tp = new GameObject("BannerTailPivot").transform; tp.SetParent(tails, false); tp.localPosition = new Vector3(s * 0.125f, 0, 0); tp.localRotation = Quaternion.Euler(0, 0, s * 6f);
-                Mesh(tp, Trapezoid(0.06f, 0.125f, 0.45f, 0.03f), cloth, "BannerTail", new Vector3(0, -0.45f, 0.015f));
+                // r4 (T5): lit like the body (were 18 lighter: Trapezoid's inward normals). Pass 2 (critic 1: "a bright hairline
+                // at the seam"): the tails are a little thinner than the body and start 3 cm up inside it, so their sunlit
+                // top edge is hidden; and their cloth is a touch lighter (they sat 5 to 7 under the body).
+                Mesh(tp, Trapezoid(0.06f, 0.125f, 0.48f, 0.024f, outward: true), BannerTailCloth(), "BannerTail", new Vector3(0, -0.45f, 0.012f));
             }
             float ph = Mathf.Abs(at.x * 3.1f + at.z * 1.7f);
             swingers.Add((hinge, fq, 2.5f, ph, 0.9f)); swingers.Add((tails, Quaternion.identity, 6f, ph + 0.6f, 0.9f));
-            Lantern(root, at + Vector3.up * 3.86f, 1f, pool: true, turret: true);   // r3: on the turret plinth, under the drum
+            Lantern(root, at + Vector3.up * 3.86f, 1f, pool: true, turret: true, yaw: yaw);   // r3: on the turret plinth, under the drum
         }
 
         void BuildMetronome(Transform m)
@@ -1173,13 +1754,92 @@ namespace LastBell.Arenas.MetronomeCourt
             // dark iron back case (trapezoid), tapered open front frame with brass edge bevels and tempo-lit seams
             Frame = new GameObject("Frame").transform; Frame.SetParent(m, false);
             float baseHalf = 3.4f, topHalf = 0.6f, h = FrameHeight;
-            Mesh(Frame, Trapezoid(baseHalf - 0.2f, topHalf - 0.05f, h - 0.1f, 0.8f), M(new Color(0.10f, 0.11f, 0.13f), 0.15f, 0f), "BackCase", new Vector3(0, 0.1f, -0.15f));
-            Mesh(Frame, Trapezoid(baseHalf - 0.75f, topHalf * 0.4f, h - 1.2f, 0.05f), M(new Color(0.07f, 0.075f, 0.09f), 0.1f, 0f), "CaseRecess", new Vector3(0, 0.5f, 0.15f));
+            // r4 (November 12 critic, T2): the back case was "a flat near-black plane" carrying stone courses (its plain dark
+            // material was classified as masonry), and the 1.6 m stiles were the same value, so only the brass bevels drew
+            // the A. Pass 2, after critic 1 (pass 1 lifted the stiles until the landmark lost its dark mass, and the iron
+            // texture drew level lines across them, which read as slate boards):
+            //   - the stiles are plain charcoal iron, one step above the old value and still well under the sky, each built
+            //     from three plates joined by riveted straps that lie square to the slope, with a neutral lit edge strip;
+            //   - the case behind is the darkest value on the landmark, so the frame separates from it by depth;
+            //   - each side of the scale plate carries three inset riveted panels that follow the taper, a clear step
+            //     lighter than the case and set in from the stile, so the dark case still outlines the frame.
+            // No new emission, no texture on the stiles.
+            Mesh(Frame, Trapezoid(baseHalf - 0.2f, topHalf - 0.05f, h - 0.1f, 0.8f), SurfM(new Color(0.10f, 0.11f, 0.14f), Surface.Iron, 0.15f), "BackCase", new Vector3(0, 0.1f, -0.15f));
+            var caseDark = PlainM(T2CaseDark, 0.05f);
+            void Quad(List<Vector3> v, List<int> t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 outward)
+            {
+                if (Vector3.Dot(Vector3.Cross(p1 - p0, p2 - p0), outward) < 0) { var s1 = p1; p1 = p3; p3 = s1; }
+                int i = v.Count; v.Add(p0); v.Add(p1); v.Add(p2); v.Add(p3); t.Add(i); t.Add(i + 1); t.Add(i + 2); t.Add(i); t.Add(i + 2); t.Add(i + 3);
+            }
+            void Slab(List<Vector3> v, List<int> t, Vector3 a, Vector3 b, Vector3 c, Vector3 d, float z0, float z1)   // a quad in XY (a, b, c, d in order round it), from z0 back to z1 front
+            {
+                Vector3 F(Vector3 p) => new Vector3(p.x, p.y, z1); Vector3 B(Vector3 p) => new Vector3(p.x, p.y, z0); var mid = (a + b + c + d) / 4;
+                Quad(v, t, F(a), F(b), F(c), F(d), Vector3.forward);
+                var ring = new[] { a, b, c, d };
+                for (int k = 0; k < 4; k++) { Vector3 e0 = ring[k], e1 = ring[(k + 1) % 4]; Quad(v, t, B(e0), B(e1), F(e1), F(e0), (e0 + e1) / 2 - mid); }
+            }
+            void Box(List<Vector3> v, List<int> t, Vector3 c, Quaternion r, Vector3 size)   // a turned box without its back face
+            {
+                Vector3 hx = r * new Vector3(size.x / 2, 0, 0), hy = r * new Vector3(0, size.y / 2, 0), hz = r * new Vector3(0, 0, size.z / 2);
+                Quad(v, t, c - hx - hy + hz, c + hx - hy + hz, c + hx + hy + hz, c - hx + hy + hz, hz);
+                Quad(v, t, c + hx - hy - hz, c + hx + hy - hz, c + hx + hy + hz, c + hx - hy + hz, hx);
+                Quad(v, t, c - hx - hy - hz, c - hx + hy - hz, c - hx + hy + hz, c - hx - hy + hz, -hx);
+                Quad(v, t, c - hx + hy - hz, c + hx + hy - hz, c + hx + hy + hz, c - hx + hy + hz, hy);
+                Quad(v, t, c - hx - hy - hz, c + hx - hy - hz, c + hx - hy + hz, c - hx - hy + hz, -hy);
+            }
+            void Bake(List<Vector3> v, List<int> t, Material mat, string nm)
+            {
+                var bm = new Mesh { name = nm }; bm.SetVertices(v); bm.SetTriangles(t, 0); bm.RecalculateNormals(); bm.RecalculateBounds();
+                Mesh(Frame, bm, mat, nm);
+            }
+            var rivetBrass = SurfM(Brass * 0.55f, Surface.Brass, 0.3f);
+            {
+                // the case panels: one mesh for all six, one for their rivets
+                float StileInner(float y) => Mathf.Lerp(baseHalf, topHalf, y / h) - 0.83f;   // the inner edge of the stile at height y
+                var pv = new List<Vector3>(); var pt = new List<int>(); var rivV = new List<Vector3>(); var rivT = new List<int>();
+                // The recess plate. It was a Trapezoid(), whose court-side face carries a normal that points north, so it was
+                // lit from behind by the tempo spot light and read lighter than anything set on it. Built facing the court.
+                float rb = baseHalf - 0.75f, rt = topHalf * 0.4f;
+                Slab(pv, pt, new Vector3(-rb, 0.5f, 0), new Vector3(rb, 0.5f, 0), new Vector3(rt, h - 0.7f, 0), new Vector3(-rt, h - 0.7f, 0), 0.10f, 0.15f);
+                Bake(pv, pt, caseDark, "CaseRecess"); pv = new List<Vector3>(); pt = new List<int>();
+                foreach (var (y0, y1) in new[] { (0.95f, 1.95f), (2.5f, 4.5f), (4.8f, 6.3f) })
+                    foreach (float s in new[] { -1f, 1f })
+                    {
+                        const float xin = 0.34f, margin = 0.24f; float xo0 = StileInner(y0) - margin, xo1 = StileInner(y1) - margin;
+                        Vector3 a = new Vector3(s * xin, y0, 0), b = new Vector3(s * xo0, y0, 0), c = new Vector3(s * xo1, y1, 0), d = new Vector3(s * xin, y1, 0);
+                        Slab(pv, pt, a, b, c, d, 0.15f, 0.19f);
+                        foreach (var (corner, dx, dy) in new[] { (a, 1f, 1f), (b, -1f, 1f), (c, -1f, -1f), (d, 1f, -1f) })
+                            Box(rivV, rivT, corner + new Vector3(s * dx * 0.13f, dy * 0.13f, 0.2f), Quaternion.identity, new Vector3(0.11f, 0.11f, 0.03f));
+                    }
+                Bake(pv, pt, PlainM(T2Panel, 0.15f), "CasePanels");
+                Bake(rivV, rivT, rivetBrass, "CaseRivets");
+            }
+            var stileIron = PlainM(T2Stile, 0.25f); var stileEdge = PlainM(T2StileEdge, 0.25f);
+            var strapV = new List<Vector3>(); var strapT = new List<int>(); var seamV = new List<Vector3>(); var seamT = new List<int>(); var studV = new List<Vector3>(); var studT = new List<int>();
             for (int s = -1; s <= 1; s += 2)
             {
                 var a = new Vector3(baseHalf * s, 0, 0.35f); var b = new Vector3(topHalf * s, h, 0.35f);
                 var rot = Quaternion.FromToRotation(Vector3.up, (b - a).normalized);
-                var stile = P(PrimitiveKind.Cube, Frame, (a + b) / 2, new Vector3(1.6f, (b - a).magnitude, 0.8f), IronM, name: "Stile"); stile.localRotation = rot;
+                var stile = P(PrimitiveKind.Cube, Frame, (a + b) / 2, new Vector3(1.6f, (b - a).magnitude, 0.8f), stileIron, name: "Stile"); stile.localRotation = rot;
+                var chamfer = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(0.72f * s, 0, 0.41f), new Vector3(0.14f, (b - a).magnitude, 0.05f), stileEdge, name: "StileChamfer"); chamfer.localRotation = rot;   // r4 (T2): the lit outer edge
+                // r4 (T2, pass 2): three plates a stile, joined by straps square to the slope: a strap a touch lighter than
+                // the plate, a dark joint line under it, and two rows of brass studs. The middle strap is split round the
+                // tempo seam. Stile space: x across (+ is the outer edge), y up the slope, z out of the face.
+                Vector3 OnFace(float x, float y, float z) => (a + b) / 2 + rot * new Vector3(x * s, y, 0.4f + z);
+                float len = (b - a).magnitude;
+                foreach (float f in new[] { 0.16f, 0.5f, 0.84f })
+                {
+                    float y = (f - 0.5f) * len;
+                    foreach (var (x0, x1) in f == 0.5f ? new[] { (-0.47f, 0.07f), (0.25f, 0.63f) } : new[] { (-0.47f, 0.63f) })
+                    {
+                        Box(strapV, strapT, OnFace((x0 + x1) / 2, y, 0.008f), rot, new Vector3(x1 - x0, 0.30f, 0.016f));
+                        Box(seamV, seamT, OnFace((x0 + x1) / 2, y - 0.175f, 0.003f), rot, new Vector3(x1 - x0, 0.05f, 0.006f));
+                        int n = Mathf.Max(2, Mathf.RoundToInt((x1 - x0) / 0.3f));
+                        for (int k = 0; k < n; k++)
+                            foreach (float dy in new[] { -0.075f, 0.075f })
+                                Box(studV, studT, OnFace(Mathf.Lerp(x0 + 0.1f, x1 - 0.1f, k / (n - 1f)), y + dy, 0.026f), rot, new Vector3(0.11f, 0.11f, 0.02f));
+                    }
+                }
                 var trim = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(-0.64f * s, 0, 0.41f), new Vector3(0.3f, (b - a).magnitude, 0.05f), M(Brass * 0.7f, 0.4f, 0.8f), name: "StileBevel"); trim.localRotation = rot;   // pass 4: aged, low-gloss brass (critic: an orange bloom inside the case)
                 // tempo seam: the middle 60% of the stile only, so it accents rather than out-glowing everything
                 var seam = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(0.16f * s, 0, 0.42f), new Vector3(0.1f, (b - a).magnitude * 0.6f, 0.02f), M(HasteTint, 0.2f, 0, true), name: "StileSeam"); seam.localRotation = rot;   // pass 4: a broader, dimmer seam (critic: thin emissive lines)
@@ -1192,6 +1852,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 }
                 Mesh(Frame, Frustum(0.7f, 0.15f, 0.03f, 0.15f, 1.1f), IronM, "Gusset", new Vector3((baseHalf - 1.0f) * s, 0.6f, 0.5f));
             }
+            Bake(strapV, strapT, PlainM(T2Strap, 0.25f), "StileStraps"); Bake(seamV, seamT, caseDark, "StileJoints"); Bake(studV, studT, rivetBrass, "StileStuds");
             // frenzy cracks: 7 branching cracks that start at the stile/brace joints and the base corners and run into the
             // case, plus dark chips knocked out of the bevel (all hidden until Broken Cadence)
             var crng = new System.Random(71);
@@ -1340,14 +2001,16 @@ namespace LastBell.Arenas.MetronomeCourt
             if (mpb == null) mpb = new MaterialPropertyBlock();   // survives a script reload
             // lantern glow follows the rod's lean across the rim; all flash together on accented transition ticks
             LanternPulseX = phase * 14f;
-            float LanternGlow(float x)
+            // r4 (B2): the chase level without the transition flash; the core and the glow ring take the full flash, the glass a little
+            float LanternChase(float x)
             {
                 float near = LightsPulse ? Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f) : SteadyNear;
-                // soft-capped (never clips to white) with the flicker, the hazard dim and the tick flash applied after the cap
+                // soft-capped (never clips to white) with the flicker and the hazard dim applied after the cap
                 float raw = (haste ? 1.3f : 1.0f) * (0.8f + 2.2f * near) * (1 + 0.3f * BeatPulse);
                 float e = 1.15f * Mathf.Clamp01(raw / 3.5f) * (LightsPulse ? 0.92f + 0.16f * Mathf.PerlinNoise(x * 1.7f, Time.time * 3f) : 1f);
-                return e * (quiet ? 0.6f : 1f) + 0.9f * flash;   // pass 3: lantern glass no longer white-hot
+                return e * (quiet ? 0.6f : 1f);
             }
+            float LanternGlow(float x) => LanternChase(x) + 0.9f * flash;
             foreach (var (r, x) in lanterns)
             {
                 if (!r) continue;
@@ -1362,15 +2025,56 @@ namespace LastBell.Arenas.MetronomeCourt
             foreach (var (r, x) in lanternGlass)
             {
                 if (!r) continue;
-                mpb.SetColor(PBase, glassTint * 0.6f); mpb.SetColor(PEmission, glassTint * (0.6f + 0.75f * LanternGlow(x))); r.SetPropertyBlock(mpb);
+                // r4 (November 12 critic, B2): the glass took 0.6 + 0.75 x glow with the flash inside the glow, 1.5 to 2.2 x
+                // cream, and clipped to pure white under the rod and on every transition tick wherever no tonemapping is
+                // applied (the autotest's elevation frames, and any camera without the post stack): the brightest thing
+                // in the shot, pulling the eye off the metronome. It now follows its own lower curve, capped just under
+                // 1 x cream, so it keeps its colour. A lantern away from the rod sits at about 0.9; the one under the rod
+                // is a clear step brighter (the cap); a transition tick lifts the others most of the way to the cap but
+                // not onto it, so the lantern under the rod stays the brightest through the flash.
+                float glass = GlassBase + GlassGain * LanternChase(x);
+                if (flash > 0) glass = Mathf.Max(glass, Mathf.Min(GlassCap - 0.025f, glass + GlassFlash * flash * (quiet ? 0.6f : 1f)));
+                mpb.SetColor(PBase, glassTint * 0.6f); mpb.SetColor(PEmission, glassTint * Mathf.Min(GlassCap, glass)); r.SetPropertyBlock(mpb);
+            }
+            // r4 (T7): the glow ring under a cap is nearly all cream (it took the full tempo colour: saturated teal in Normal)
+            // at about half the glass level; the lip inside it is the glass's cream at 0.8 of the glass level
+            var glowRingTint = Color.Lerp(tint, glassTint, 0.85f);
+            foreach (var (r, x) in lanternRings)
+            {
+                if (!r) continue;
+                mpb.SetColor(PBase, glowRingTint * 0.15f); mpb.SetColor(PEmission, glowRingTint * 0.55f * Mathf.Min(1f, 0.8f + 0.2f * LanternGlow(x))); r.SetPropertyBlock(mpb);
+            }
+            foreach (var (r, x) in lanternLips)
+            {
+                if (!r) continue;
+                mpb.SetColor(PBase, glassTint * 0.1f); mpb.SetColor(PEmission, glassTint * 0.8f * Mathf.Min(GlassCap, GlassBase + GlassGain * LanternChase(x))); r.SetPropertyBlock(mpb);
             }
             if (poolMpb == null) poolMpb = new MaterialPropertyBlock();
+            // r4 (November 12 critic, B3): the pools lie on the dial band and the tempo ring, so they follow the steady
+            // floor-light rule in every fight, the Tempo Tyrant's included: one fixed level, no glow following the rod,
+            // no beat pulse and no transition flash. (They swung 0.56..1.37 over two seconds of Haste before.) Only the
+            // hazard dim and the tempo colour still change them; the lantern glass, the ring and the metronome pulse.
+            PoolGain = (quiet ? 0.6f : 1f) * (0.7f + 0.6f * SteadyNear);
+            // evidence from a real fight (the autotest cannot be changed in this round): the level the pools were actually
+            // given on every settled-tempo frame of a Tempo Tyrant fight, kept per tempo and hazard-dim state and written
+            // to the log once when the fight ends. Steady means max/min is 1 inside each state.
+            if (fight && tyrant && (tempoBlend <= 0f || tempoBlend >= 1f) && pools.Count > 0)
+            {
+                var pc = LightTint * PoolGain; float pl = pc.r * 0.299f + pc.g * 0.587f + pc.b * 0.114f; int st = (tempoBlend >= 1f ? 0 : 2) + (quiet ? 1 : 0);   // by the settled look, not the clock: the blend trails a tempo change by a frame
+                poolLo[st] = poolSeen[st] == 0 ? pl : Mathf.Min(poolLo[st], pl); poolHi[st] = Mathf.Max(poolHi[st], pl); poolSeen[st]++;
+            }
+            else if (!fight && poolSeen[0] + poolSeen[1] + poolSeen[2] + poolSeen[3] > 60)
+            {
+                float worst = 1f; var parts = new List<string>(); var names = new[] { "Haste", "Haste dimmed", "Normal", "Normal dimmed" };
+                for (int s = 0; s < 4; s++)
+                    if (poolSeen[s] > 0) { worst = Mathf.Max(worst, poolLo[s] > 0 ? poolHi[s] / poolLo[s] : 99f); parts.Add($"{names[s]} {poolLo[s]:0.000}..{poolHi[s]:0.000} ({poolSeen[s]} frames)"); }
+                Debug.Log($"[metronome-court] floor pools in the Tempo Tyrant fight: worst max/min {worst:0.000} within a tempo and hazard-dim state; " + string.Join(", ", parts));
+                System.Array.Clear(poolSeen, 0, 4); System.Array.Clear(poolHi, 0, 4); System.Array.Clear(poolLo, 0, 4);
+            }
             foreach (var (r, x) in pools)
             {
                 if (!r) continue;
-                float near = LightsPulse ? Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f) : SteadyNear;
-                float k = (quiet ? 0.6f : 1f) * (0.7f + 0.6f * near) * (1 + 0.06f * BeatPulse + 0.25f * flash);   // gentle: floor glow, not a strobe
-                poolMpb.SetColor(PColorHigh, LightTint * k); r.SetPropertyBlock(poolMpb);
+                poolMpb.SetColor(PColorHigh, LightTint * PoolGain); r.SetPropertyBlock(poolMpb);
             }
             var seamTint = frenzy && LightsPulse && Mathf.PerlinNoise(Time.time * 7, 1.7f) > 0.55f ? CrackGlow : tint;
             mpb.SetColor(PBase, seamTint); mpb.SetColor(PEmission, seamTint * ((haste ? 0.6f : 0.45f) + 0.3f * flash));

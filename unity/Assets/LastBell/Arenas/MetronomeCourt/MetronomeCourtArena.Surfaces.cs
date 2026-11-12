@@ -13,11 +13,11 @@ namespace LastBell.Arenas.MetronomeCourt
     public sealed partial class MetronomeCourtArena
     {
         public static bool SurfaceKit = true;   // review switch; the October 27 pass-1 build had no kit
-        enum Surface { None, Masonry, Ivory, Brass, Iron, Cloth, Slate, Paving, Weathered }   // r3: Weathered (pier masonry), assigned explicitly   // pass 4: slate roofs and soft bridge paving (assigned explicitly)
+        enum Surface { None, Masonry, Ivory, Brass, Iron, Cloth, Slate, Paving, Weathered, Coursed }   // r4 (T6): Coursed (rim ledge wall and drum), assigned explicitly   // r3: Weathered (pier masonry), assigned explicitly   // pass 4: slate roofs and soft bridge paving (assigned explicitly)
         static readonly Dictionary<Surface, Texture2D> surfaceTex = new Dictionary<Surface, Texture2D>();
         static readonly Dictionary<Surface, float> surfaceMean = new Dictionary<Surface, float>();
         // metres covered by one texture repeat
-        static float TileOf(Surface s) => s == Surface.Masonry || s == Surface.Weathered ? 3.6f : s == Surface.Ivory ? 2.0f : s == Surface.Brass ? 1.2f : s == Surface.Iron ? 2.0f : s == Surface.Slate ? 1.8f : s == Surface.Paving ? 2.4f : 0.8f;
+        static float TileOf(Surface s) => s == Surface.Masonry || s == Surface.Weathered || s == Surface.Coursed ? 3.6f : s == Surface.Ivory ? 2.0f : s == Surface.Brass ? 1.2f : s == Surface.Iron ? 2.0f : s == Surface.Slate ? 1.8f : s == Surface.Paving ? 6.9f : 0.8f;   // r4 (T8): paving repeats every 6.9 m, six bridge courses (2.4 m repeated the same stain on every second course)
         public int SurfaceUvBakes { get; private set; }
 
         static Surface Classify(Color c, float metal, bool glow)
@@ -61,6 +61,9 @@ namespace LastBell.Arenas.MetronomeCourt
             int x0 = ((xi % p) + p) % p, y0 = ((yi % p) + p) % p, x1 = (x0 + 1) % p, y1 = (y0 + 1) % p;
             return Mathf.Lerp(Mathf.Lerp(SHash(x0, y0, seed), SHash(x1, y0, seed), fx), Mathf.Lerp(SHash(x0, y1, seed), SHash(x1, y1, seed), fx), fy);
         }
+        // 0 below e0, 1 above e1, smooth between (e0 > e1 falls instead). Mathf.SmoothStep(a, b, t) is an interpolation from
+        // a to b, not this threshold.
+        static float Edge(float e0, float e1, float x) { float k = Mathf.Clamp01((x - e0) / (e1 - e0)); return k * k * (3 - 2 * k); }
         static float Broad(float u, float v, int seed) => (SNoise(u * 3, v * 3, 3, seed) * 0.6f + SNoise(u * 6, v * 6, 6, seed + 1) * 0.4f) - 0.5f;   // -0.5..0.5, no fine octave
 
         static Texture2D SurfaceTexture(Surface s)
@@ -88,6 +91,24 @@ namespace LastBell.Arenas.MetronomeCourt
                             val *= Mathf.Lerp(1f, 1.12f, Mathf.SmoothStep(0.80f, 0.90f, rv) * Mathf.SmoothStep(0.985f, 0.95f, rv));   // lit upper arris
                             if (SHash(block, row, 14) > 0.6f && fu + (1 - rv) * 0.6f < 0.3f) val *= 0.84f;   // a chipped corner
                             val *= Mathf.Lerp(0.5f, 1f, Mathf.SmoothStep(0.03f, 0.09f, joint));             // painted joint, one value step down
+                            break;
+                        }
+                        case Surface.Coursed:
+                        {   // r4 (November 12 critic, T6: "blank bands"): the rim ledge wall and the drum. Masonry's courses and
+                            // blocks, with the joints really drawn. (Masonry hands its joint and arris edges to
+                            // Mathf.SmoothStep, which interpolates, so they come out as one even tint and only the per-block
+                            // steps show.) A 4 cm joint two value steps down, a lit arris along the top of each block, and
+                            // a face that darkens toward its foot.
+                            int row = Mathf.FloorToInt(v * 5); float rv = v * 5 - row;
+                            float off = SHash(row, 0, 11) * 0.6f + (row % 2) * 0.5f, bu = (u * 2 + off) % 2f; int block = Mathf.FloorToInt(bu); float fu = bu - block;
+                            float bed = Mathf.Min(rv, 1 - rv) * 0.72f, head = Mathf.Min(fu, 1 - fu) * 1.8f, joint = Mathf.Min(bed, head);   // metres to the nearest joint
+                            val = 0.82f + 0.28f * SHash(block, row, 12);
+                            val *= 1 + 0.12f * (SNoise(u * 2, v * 2, 2, 15) - 0.5f) + 0.07f * (SNoise(u * 5, v * 5, 5, 16) - 0.5f);   // pigment patches
+                            val *= Mathf.Lerp(0.91f, 1.03f, rv);                                               // darker toward the foot of the block
+                            float top = (1 - rv) * 0.72f;
+                            val *= 1 + 0.3f * Edge(0.02f, 0.035f, top) * Edge(0.1f, 0.06f, top);          // lit arris under the bed joint
+                            if (SHash(block, row, 14) > 0.6f && fu + (1 - rv) * 0.6f < 0.3f) val *= 0.86f;    // a chipped corner
+                            val *= Mathf.Lerp(0.56f, 1f, Edge(0.012f, 0.03f, joint));                         // the joint
                             break;
                         }
                         case Surface.Weathered:
@@ -153,14 +174,23 @@ namespace LastBell.Arenas.MetronomeCourt
                         case Surface.Paving:
                         {   // pass 4 (critic: "blocky, hard-stepped patches" on the bridge): the slabs are separate stones, so the
                             // paving texture carries only soft wear: broad mottle and a few soft stains, no blocks and no steps
-                            val = 1f + 0.1f * (SNoise(u * 3, v * 3, 3, 61) - 0.5f) + 0.05f * (SNoise(u * 6, v * 6, 6, 62) - 0.5f);
-                            val -= 0.07f * Mathf.SmoothStep(0.62f, 0.8f, SNoise(u * 4, v * 4, 4, 63));
+                            // r4 (T8): the repeat is 6.9 m now, so every frequency is three times what it was (the mottle keeps
+                            // its size). The stains had been handed to Mathf.SmoothStep (an interpolation), which spread them
+                            // into an even tint. Now two or three soft dark stains a slab from two layers of different size, and
+                            // a few paler worn patches.
+                            val = 1f + 0.1f * (SNoise(u * 9, v * 9, 9, 61) - 0.5f) + 0.05f * (SNoise(u * 18, v * 18, 18, 62) - 0.5f);
+                            val -= 0.07f * Edge(0.5f, 0.8f, SNoise(u * 11, v * 11, 11, 63));
+                            val -= 0.05f * Edge(0.55f, 0.8f, SNoise(u * 17 + 0.31f, v * 17 + 0.77f, 17, 65));
+                            val += 0.05f * Edge(0.6f, 0.82f, SNoise(u * 8 + 0.37f, v * 8 + 0.61f, 8, 64));
                             break;
                         }
                         case Surface.Cloth:
                         {   // broad vertical folds and a darker hem band
-                            val = 0.84f + 0.2f * (0.5f + 0.5f * Mathf.Sin(u * Mathf.PI * 2 * 3 + Mathf.Sin(v * 6.28f) * 0.4f)) - 0.08f;
-                            if (v < 0.08f) val *= 0.85f;
+                            // r4 (T5: "a flat board with no folds"): four folds a repeat (one every 0.2 m) at +-12%: broad lit
+                            // crowns, a narrower dark valley, and the folds wander a little. The darker "hem" band is gone: the
+                            // texture repeats every 0.8 m, so it fell as a stripe across the middle of a banner.
+                            float fold = 0.5f + 0.5f * Mathf.Sin(u * Mathf.PI * 2 * 4 + Mathf.Sin(v * 6.28f) * 0.5f);
+                            val = 0.78f + 0.24f * Mathf.Pow(fold, 0.6f);
                             break;
                         }
                     }
@@ -191,23 +221,32 @@ namespace LastBell.Arenas.MetronomeCourt
                 var mesh = Instantiate(src); mesh.name = src.name + " (box UV)";
                 var v = mesh.vertices; var n = mesh.normals; var uv = new Vector2[v.Length];
                 var l2w = mf.transform.localToWorldMatrix; var nrm = l2w.inverse.transpose;
-                bool round = src.name.StartsWith("Prim_Cylinder") || src.name.StartsWith("Prim_Cone") || src.name.StartsWith("Sector");
+                // r4 (B1): a Round_ lathe keeps each vertex's unwrapped angle in uv.x (seam at its local -z). World angle =
+                // latheC + latheS x that angle, so the wrap never falls inside a facet (atan2 flipped sign across one facet
+                // at due north and squeezed a whole turn of texture into it).
+                bool lathe = src.name.StartsWith("Round_"); var srcUv = lathe ? src.uv : null; float latheC = 0, latheS = 1;
+                if (lathe)
+                {
+                    var d0 = l2w.MultiplyVector(Vector3.forward); var d1 = l2w.MultiplyVector(Vector3.right);
+                    latheC = Mathf.Atan2(d0.x, d0.z); latheS = Mathf.DeltaAngle(latheC * Mathf.Rad2Deg, Mathf.Atan2(d1.x, d1.z) * Mathf.Rad2Deg) >= 0 ? 1 : -1;
+                }
+                bool round = lathe || src.name.StartsWith("Prim_Cylinder") || src.name.StartsWith("Prim_Cone") || src.name.StartsWith("Sector");
                 var centre = mf.transform.position;
                 for (int i = 0; i < v.Length; i++)
                 {
                     var p = l2w.MultiplyPoint3x4(v[i]); var w = n.Length > i ? nrm.MultiplyVector(n[i]).normalized : Vector3.up;
                     float ax = Mathf.Abs(w.x), ay = Mathf.Abs(w.y), az = Mathf.Abs(w.z);
-                    if (round && ay < 0.6f)
+                    if (lathe ? srcUv[i].y > 0.5f : round && ay < 0.6f)   // a lathe says which vertices are wall; older round parts are judged by their normal
                     {   // pass 3: wrap-around mapping on round sides (arc length about the part's axis), so a drum or ledge
                         // carries continuous courses instead of a per-vertex patchwork of planar projections
                         var d = p - centre; float rad = Mathf.Max(0.3f, new Vector2(d.x, d.z).magnitude);
-                        uv[i] = new Vector2(Mathf.Atan2(d.x, d.z) * rad, p.y) / tile;
+                        uv[i] = new Vector2((lathe ? latheC + latheS * srcUv[i].x : Mathf.Atan2(d.x, d.z)) * rad, p.y) / tile;
                     }
                     else if (round)
                     {   // pass 4: tops of round parts (the rim ledge ring) in polar form: courses run round the ring and joints
                         // point at the centre, instead of straight bands that read as steps across the ledge
                         var d = p - centre; float rad = new Vector2(d.x, d.z).magnitude;
-                        uv[i] = new Vector2(Mathf.Atan2(d.x, d.z) * Mathf.Max(rad, 0.3f), rad) / tile;
+                        uv[i] = new Vector2((lathe ? latheC + latheS * srcUv[i].x : Mathf.Atan2(d.x, d.z)) * Mathf.Max(rad, 0.3f), rad) / tile;
                     }
                     else uv[i] = (ay >= ax && ay >= az ? new Vector2(p.x, p.z) : ax >= az ? new Vector2(p.z, p.y) : new Vector2(p.x, p.y)) / tile;
                 }
