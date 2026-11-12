@@ -180,8 +180,11 @@ namespace LastBell.Arenas.MetronomeCourt
                         }
                         case Surface.Cloth:
                         {   // broad vertical folds and a darker hem band
-                            val = 0.84f + 0.2f * (0.5f + 0.5f * Mathf.Sin(u * Mathf.PI * 2 * 3 + Mathf.Sin(v * 6.28f) * 0.4f)) - 0.08f;
-                            if (v < 0.08f) val *= 0.85f;
+                            // r4 (T5: "a flat board with no folds"): four folds a repeat (one every 0.2 m) at +-12%: broad lit
+                            // crowns, a narrower dark valley, and the folds wander a little. The darker "hem" band is gone: the
+                            // texture repeats every 0.8 m, so it fell as a stripe across the middle of a banner.
+                            float fold = 0.5f + 0.5f * Mathf.Sin(u * Mathf.PI * 2 * 4 + Mathf.Sin(v * 6.28f) * 0.5f);
+                            val = 0.78f + 0.24f * Mathf.Pow(fold, 0.6f);
                             break;
                         }
                     }

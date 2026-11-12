@@ -509,7 +509,9 @@ namespace LastBell.Arenas.MetronomeCourt
         }
 
         // trapezoid prism in the XY plane (base at y = 0), centred on x, depth along z
-        static Mesh Trapezoid(float baseHalf, float topHalf, float h, float depth)
+        // `outward`: wind the faces so their normals point out of the solid. Without it the normals point in (the court-side
+        // face is lit as if it faced north), which the older parts were tuned with; r4 uses `outward` for the banner tails.
+        static Mesh Trapezoid(float baseHalf, float topHalf, float h, float depth, bool outward = false)
         {
             var p = new[] { new Vector3(-baseHalf, 0, 0), new Vector3(baseHalf, 0, 0), new Vector3(topHalf, h, 0), new Vector3(-topHalf, h, 0) };
             var v = new List<Vector3>(); var t = new List<int>();
@@ -518,6 +520,7 @@ namespace LastBell.Arenas.MetronomeCourt
             Quad(p[0], p[1], p[2], p[3]);                       // front (+z side faces the court)
             Quad(p[1] + dz, p[0] + dz, p[3] + dz, p[2] + dz);   // back
             for (int i = 0; i < 4; i++) { var a = p[i]; var b = p[(i + 1) % 4]; Quad(b, a, a + dz, b + dz); }
+            if (outward) for (int i = 0; i < t.Count; i += 3) { int x = t[i + 1]; t[i + 1] = t[i + 2]; t[i + 2] = x; }
             var m = new Mesh { name = "Trapezoid" }; m.SetVertices(v); m.SetTriangles(t, 0); m.RecalculateNormals(); m.RecalculateBounds(); return m;
         }
 
@@ -1149,10 +1152,21 @@ namespace LastBell.Arenas.MetronomeCourt
                     for (int x = 0; x < W; x++)
                     {
                         float u = (x + 0.5f) / W, v = (y + 0.5f) / H;
-                        float hot = Mathf.Exp(-((u - 0.5f) * (u - 0.5f)) / (0.34f * 0.34f) - ((v - 0.36f) * (v - 0.36f)) / (0.40f * 0.40f));
-                        float val = (0.92f + 0.08f * hot) * Mathf.Lerp(1f, 0.84f, Mathf.SmoothStep(0.62f, 1f, v));
-                        float warm = Mathf.SmoothStep(0.45f, 0f, v), cool = Mathf.SmoothStep(0.62f, 1f, v);   // warmer foot, cooler head
-                        px[y * W + x] = new Color(val, val * (1f - 0.02f * warm), val * (1f - 0.06f * warm + 0.03f * cool), 1f);
+                        // r4 (T5: "one flat cream value, a lightbox with no flame"): the B2 map meant to dim the head of the pane
+                        // but handed its edges to Mathf.SmoothStep (an interpolation), so the pane came out within 8% top to
+                        // bottom. Now: a flame low in the pane at 0.92, the glass round it at 0.84, the foot a little
+                        // under that, and the top third falling to 0.65.
+                        // Pass 2 (critic 1: "a frosted lightbox with a soft hot spot", "the same cream from top to bottom"): a
+                        // small warm core low in the pane (a quarter of its width, a third of its height), cream glass round
+                        // it, a cooler and dimmer head, and a thin dark glazing bar at 40% of the height, so the pane reads
+                        // as two lights over a flame. The peak stays at 0.92, the B2 map's peak.
+                        float core = Mathf.Exp(-((u - 0.5f) * (u - 0.5f)) / (0.13f * 0.13f) - ((v - 0.24f) * (v - 0.24f)) / (0.15f * 0.15f));
+                        float halo = Mathf.Exp(-((u - 0.5f) * (u - 0.5f)) / (0.36f * 0.36f) - ((v - 0.28f) * (v - 0.28f)) / (0.3f * 0.3f));
+                        float head = Edge(0.5f, 0.95f, v);
+                        float val = 0.74f + 0.1f * halo + 0.08f * core - 0.2f * head - 0.03f * Edge(0.1f, 0f, v);
+                        float bar = 1f - 0.62f * Edge(0.028f, 0.012f, Mathf.Abs(v - 0.4f));
+                        float r = val * bar, g = val * bar * (1f - 0.07f * core + 0.01f * head), b = val * bar * (1f - 0.2f * core - 0.05f * halo + 0.06f * head);
+                        px[y * W + x] = new Color(r, g, b, 1f);
                     }
                 glassGlow = new Texture2D(W, H, TextureFormat.RGBA32, false, false) { name = "MetronomeCourt_GlassGlow", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
                 glassGlow.SetPixels32(px); glassGlow.Apply(false, Application.isPlaying);   // readable in the editor, for the menu's baked copy
@@ -1277,7 +1291,28 @@ namespace LastBell.Arenas.MetronomeCourt
             var c = new Color(0.14f, 0.50f, 0.48f);
             bannerCloth = new Material(SurfM(c, Surface.Cloth, 0.3f)) { name = "MetronomeCourt_BannerCloth" };
             bannerCloth.EnableKeyword("_EMISSION"); bannerCloth.SetColor("_EmissionColor", new Color(0.02f, 0.07f, 0.07f));
+            // r4 (T5: "a flat board with no folds"): on the shade face nearly all of the cloth's value is this emission, which
+            // was one flat colour, so the painted folds never showed. The emission now carries the cloth texture too.
+            if (SurfaceKit) { bannerCloth.SetTexture("_EmissionMap", SurfaceTexture(Surface.Cloth)); bannerCloth.SetColor("_EmissionColor", new Color(0.02f, 0.07f, 0.07f) / surfaceMean[Surface.Cloth]); }
             return bannerCloth;
+        }
+        static Material bannerTailCloth;
+        static Material BannerTailCloth()
+        {
+            if (bannerTailCloth) return bannerTailCloth;
+            bannerTailCloth = new Material(BannerCloth()) { name = "MetronomeCourt_BannerTailCloth" };
+            bannerTailCloth.SetColor("_EmissionColor", bannerTailCloth.GetColor("_EmissionColor") * 1.22f);
+            return bannerTailCloth;
+        }
+        // r4 (T5: "the border reads mid-grey, not ivory"): the banners hang on the shade face of their posts, where the
+        // ivory border came out darker than the cloth (the cloth has its own faint emission). The border gets the same help.
+        static Material bannerBorder;
+        static Material BannerBorder()
+        {
+            if (bannerBorder) return bannerBorder;
+            bannerBorder = new Material(M(new Color(0.85f, 0.80f, 0.68f), 0.3f)) { name = "MetronomeCourt_BannerBorder" };
+            bannerBorder.EnableKeyword("_EMISSION"); bannerBorder.SetColor("_EmissionColor", new Color(0.118f, 0.099f, 0.065f));   // pass 2 (critic 1: "pale grey-beige in shade"): the same level, yellower
+            return bannerBorder;
         }
         // round 3 (N6): an aged-brass chain swag between neighbouring near-rim bollards, hung from rings on their collars
         void BuildSwags(Transform stat)
@@ -1620,7 +1655,7 @@ namespace LastBell.Arenas.MetronomeCourt
             // r3 (F4): a real banner. It hangs from a brass rod on two brackets, 0.3 m clear of the shaft (a visible gap and
             // shadow), lighter teal with an ivory border, a darker hem and a brass bell glyph, a swallowtail with a proper
             // notch, and it sways: the body from the rod, the tails a little more from the body's foot
-            var cloth = BannerCloth(); var glyph = M(new Color(0.72f, 0.6f, 0.34f), 0.3f); var border = M(new Color(0.85f, 0.80f, 0.68f), 0.3f);
+            var cloth = BannerCloth(); var glyph = M(new Color(0.72f, 0.6f, 0.34f), 0.3f); var border = BannerBorder();
             float bannerLen = new[] { 1.6f, 1.25f, 1.9f }[Mathf.Abs(Mathf.RoundToInt(yaw / 10f)) % 3];   // pass 4: three lengths round the court
             foreach (float s in new[] { -0.3f, 0.3f })
                 P(PrimitiveKind.Cube, stat, at + inward * 0.53f + side * s + Vector3.up * 2.87f, new Vector3(0.04f, 0.04f, 0.32f), agedBrass, new Vector3(0, faceYaw, 0), "BannerBracket");
@@ -1642,7 +1677,10 @@ namespace LastBell.Arenas.MetronomeCourt
             foreach (float s in new[] { -1f, 1f })
             {
                 var tp = new GameObject("BannerTailPivot").transform; tp.SetParent(tails, false); tp.localPosition = new Vector3(s * 0.125f, 0, 0); tp.localRotation = Quaternion.Euler(0, 0, s * 6f);
-                Mesh(tp, Trapezoid(0.06f, 0.125f, 0.45f, 0.03f), cloth, "BannerTail", new Vector3(0, -0.45f, 0.015f));
+                // r4 (T5): lit like the body (were 18 lighter: Trapezoid's inward normals). Pass 2 (critic 1: "a bright hairline
+                // at the seam"): the tails are a little thinner than the body and start 3 cm up inside it, so their sunlit
+                // top edge is hidden; and their cloth is a touch lighter (they sat 5 to 7 under the body).
+                Mesh(tp, Trapezoid(0.06f, 0.125f, 0.48f, 0.024f, outward: true), BannerTailCloth(), "BannerTail", new Vector3(0, -0.45f, 0.012f));
             }
             float ph = Mathf.Abs(at.x * 3.1f + at.z * 1.7f);
             swingers.Add((hinge, fq, 2.5f, ph, 0.9f)); swingers.Add((tails, Quaternion.identity, 6f, ph + 0.6f, 0.9f));
